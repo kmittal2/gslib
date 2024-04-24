@@ -9,6 +9,7 @@
 #include "fail.h"
 #include "mem.h"
 #include "poly.h"
+#include <stdio.h>
 
 #define lob_bnd_setup  PREFIXED_NAME(lob_bnd_setup)
 #define lob_bnd_lin_1  PREFIXED_NAME(lob_bnd_lin_1)
@@ -70,6 +71,26 @@ struct dbl_range { double min,max; };
 
 #define PI 3.1415926535897932384626433832795028841971693993751058209749445923
 
+void printit_lob_bnd(const double *p, const int size, char *myString)
+{
+    printf("Printing in lob_bnd %s\n",myString);
+    for (int i = 0; i < size;)
+    {
+        for (int j = 0; j < 8 && i < size; j++)
+        {
+            printf("%g ",p[i]);
+            i++;
+        }
+        printf("\n");
+    }
+}
+
+void printit_lob_bnd_dbl_range(const struct dbl_range *p, char *myString)
+{
+    printf("Printing dbl_range in lob_bnd %s\n",myString);
+    printf("%g %g\n",p->min,p->max);
+}
+
 void lob_bnd_setup(double *restrict data, unsigned n, unsigned m)
 {{
   unsigned nm = n*m, i,j;
@@ -83,11 +104,16 @@ void lob_bnd_setup(double *restrict data, unsigned n, unsigned m)
   
   /* set z and Q to Lobatto nodes, weights */
   lobatto_quad(z,Q,n);
+
+//  printit_lob_bnd(z, n, "GLL nodes");
+//  printit_lob_bnd(Q, n, "GLL weights");
   
   /* Q0, Q1 : linear functionals on the GLL nodal basis
               for the zeroth and first Legendre coefficient */
   for(i=n;i;) --i, Q[2*i]=Q[i]/2, Q[2*i+1] = 3*Q[2*i]*z[i];
   /*for(i=0;i<n;++i) Q0[i]=Q0[i]/2, Q1[i] = 3*Q0[i]*z[i];*/
+
+//  printit_lob_bnd(Q, 2*n, "linear functions for the zeroth and first Legendre coefficient");
   
   /* h : m Chebyshev nodes */
   h[0] = -1, h[m-1] = 1;
@@ -152,7 +178,6 @@ static void lob_bnd_ext(
 {
   unsigned i,j,k;
   for(i=0;i<mr;++i) a[2*i+1]=a[2*i+0]=0;
-
   {
     const double *restrict br = br_;
     for(j=0;j<n;++j) {
@@ -261,7 +286,9 @@ struct dbl_range lob_bnd_1(
   const double *restrict u, double *restrict work)
 {
   lob_bnd_lin_1(work, lob_bnd_data,n,m, u,1);
-  return minmax(work,m);
+  struct dbl_range t = minmax(work,m);
+//  printit_lob_bnd_dbl_range(&t,"lob_bnd_1");
+  return t;
 }
 
 /* work holds 2*mr*ms + 2*mr + 2*mr*ns

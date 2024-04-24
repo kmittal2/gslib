@@ -26,11 +26,11 @@ struct findpts_local_hash_data_2 {
 struct findpts_local_data_2 {
   unsigned ntot;
   const double *elx[2];
-  const unsigned *nsid;
   struct obbox_2 *obb;
   struct findpts_local_hash_data_2 hd;
   struct findpts_el_data_2 fed;
   double tol;
+  const unsigned *nsid;
   double *distrsti;
   const double *distfint;
   uint ims;
@@ -105,11 +105,11 @@ struct findpts_local_hash_data_3 {
 struct findpts_local_data_3 {
   unsigned ntot;
   const double *elx[3];
-  const unsigned *nsid;
   struct obbox_3 *obb;
   struct findpts_local_hash_data_3 hd;
   struct findpts_el_data_3 fed;
   double tol;
+  const unsigned *nsid;
   double *distrsti;
   const double *distfint; 
   uint ims;

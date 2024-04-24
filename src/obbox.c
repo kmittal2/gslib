@@ -9,6 +9,7 @@
 #include "tensor.h"
 #include "poly.h"
 #include "lob_bnd.h"
+#include <stdio.h>
 
 #define obbox_calc_2  PREFIXED_NAME(obbox_calc_2)
 #define obbox_calc_3  PREFIXED_NAME(obbox_calc_3)
@@ -124,6 +125,28 @@ double obbox_test_2(const struct obbox_2 *const b,
 
 #define DO_MAX(a,b) do { unsigned temp = b; if(temp>a) a=temp; } while(0)
 
+//printf("global bounding box (%g^%u):\n",(double)p->hash_n,D);
+
+void printit(const double *p, const int size, char *myString)
+{
+    printf("Printing %s\n",myString);
+    for (int i = 0; i < size;)
+    {
+        for (int j = 0; j < 8 && i < size; j++)
+        {
+            printf("%g ",p[i]);
+            i++;
+        }
+        printf("\n");
+    }
+}
+
+void printit_obbox_dbl_range(const struct dbl_range *p, char *myString)
+{
+    printf("Printing dbl_range in lob_bnd %s\n",myString);
+    printf("%g %g\n",p->min,p->max);
+}
+
 void obbox_calc_2(struct obbox_2 *out,
                   const double *const elx[2],
                   const unsigned n[2], uint nel,
@@ -143,6 +166,9 @@ void obbox_calc_2(struct obbox_2 *out,
   DO_MAX(wsize,gll_lag_size(ns));
   data = tmalloc(double, 2*(nr+ns)+lbsize0+lbsize1+wsize);
 
+//  printit(x, nr*nr, "x coordinates");
+//  printit(y, nr*nr, "y coordinates");
+
   {
     double *const I0r = data, *const I0s = data+2*nr;
     double *const lob_bnd_data_r = data+2*(nr+ns),
@@ -158,6 +184,8 @@ void obbox_calc_2(struct obbox_2 *out,
     SETUP_DIR(r); SETUP_DIR(s);
     
     #undef SETUP_DIR
+
+//    printit(lob_bnd_data_r, nr*mr, "lob_bnd_data_r");
     
     for(;nel;--nel,x+=nrs,y+=nrs,++out) {
       double x0[2], J[4], Ji[4];
@@ -167,6 +195,9 @@ void obbox_calc_2(struct obbox_2 *out,
       x0[0] = tensor_ig2(J  , I0r,nr, I0s,ns, x, work);
       x0[1] = tensor_ig2(J+2, I0r,nr, I0s,ns, y, work);
       mat_inv_2(Ji, J);
+//      printit(J, 4, "Jacobian");
+//      printit(Ji, 4, "Jacobian inverse");
+
 
       /* double work[2*m##r] */
       #define DO_BOUND(bnd,merge,r,x,work) do { \
@@ -185,7 +216,13 @@ void obbox_calc_2(struct obbox_2 *out,
       } while(0)
 
       DO_EDGE(0,r,x,y,work);
+
+//      printit_obbox_dbl_range(&ab[0],"ab0-E0");
+//      printit_obbox_dbl_range(&ab[1],"ab1");
+
       DO_EDGE(1,r,&x[nrs-nr],&y[nrs-nr],work);
+//      printit_obbox_dbl_range(&ab[0],"ab0-E1");
+//      printit_obbox_dbl_range(&ab[1],"ab1");
 
       /* double work[4*ns + 2*ms] */
       #define GET_EDGE(off) do { \
@@ -195,7 +232,11 @@ void obbox_calc_2(struct obbox_2 *out,
       } while(0)
   
       GET_EDGE(0);
+//      printit_obbox_dbl_range(&ab[0],"ab0-E2");
+//      printit_obbox_dbl_range(&ab[1],"ab1");
       GET_EDGE(nr-1);
+//      printit_obbox_dbl_range(&ab[0],"ab0-E3");
+//      printit_obbox_dbl_range(&ab[1],"ab1");
   
       #undef GET_EDGE
       #undef DO_EDGE
@@ -203,6 +244,12 @@ void obbox_calc_2(struct obbox_2 *out,
 
       out->x[0] = dbl_range_expand(ab[0],tol),
       out->x[1] = dbl_range_expand(ab[1],tol);
+//      printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
+//      printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
+
+
+//      printit_obbox_dbl_range(&tb[0],"tb0-final");
+//      printit_obbox_dbl_range(&tb[1],"tb1-final");
   
       {
         const double av0=(tb[0].min+tb[0].max)/2, av1=(tb[1].min+tb[1].max)/2;
@@ -216,6 +263,8 @@ void obbox_calc_2(struct obbox_2 *out,
         out->A[2]=di1*Ji[2], out->A[3]=di1*Ji[3];
       }
 
+//      printit(out->c0, 2, "center");
+//      printit(out->A, 4, "def Jac");
     }
   }
   

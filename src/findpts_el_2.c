@@ -28,6 +28,20 @@
 #include <stdio.h>
 #endif
 
+void printit_fpt_el2(const double *p, const int size, char *myString)
+{
+    printf("Printing %s\n",myString);
+    for (int i = 0; i < size;)
+    {
+        for (int j = 0; j < 8 && i < size; j++)
+        {
+            printf("%g ",p[i]);
+            i++;
+        }
+        printf("\n");
+    }
+}
+
 /* A is row-major */
 static void lin_solve_2(double x[2], const double A[4], const double y[2])
 {
@@ -577,16 +591,20 @@ static void findpt_area(
     fd->lag[0](wtr+2*i*nr, fd->lag_data[0], nr, 1, p[i].r[0]);
   for(i=0;i<pn;++i)
     fd->lag[1](wts+2*i*ns, fd->lag_data[1], ns, 1, p[i].r[1]);
+//  printf("%f %f-k10-initr \n",p[0].r[0],p[0].r[1]);
   for(d=0;d<2;++d) {
     tensor_mxm(slice,nr, fd->x[d],ns, wts,2*pn);
     for(i=0;i<pn;++i) {
       const double *const wtr_i = wtr+2*i*nr, *const slice_i = slice+2*i*nr;
       double *const jac_i = jac+4*i+2*d;
-      resid[2*i+d] = p[i].x[d] - tensor_ig1(jac_i,
-        wtr_i,nr, slice_i);
+      double dum = tensor_ig1(jac_i,
+                              wtr_i,nr, slice_i);
+      resid[2*i+d] = p[i].x[d] - dum;
+//      printf("%u %u %f %f-k10dix-x*\n",d,i,p[i].x[d],dum);
       jac_i[1] = tensor_i1(wtr_i,nr, slice_i+nr);
     }
   }
+
   /* perform Newton step */
   for(i=0;i<pn;++i) {
     if(reject_prior_step_q(out+i,resid+2*i,p+i,tol)) continue;
@@ -594,6 +612,9 @@ static void findpt_area(
   }
 }
 
+//edge index is 0,1,2,3 in reverse order for CSSRR i.e. R = -1 is 0, R=1 = 1.
+// dn is 0,0,1,1
+// de is 1,1,0,0
 /* work[(10+3*n)*pn] */
 static void findpt_edge(
   struct findpts_el_pt_2 *const out,
@@ -626,16 +647,17 @@ static void findpt_edge(
     for(i=0;i<pn;++i) {
       const double *const slice_i = slice+3*i;
       double r;
-      resid[2*i+d] = r = p[i].x[d] - slice_i[0];
-      jac[4*i+2*d+de] = slice_i[1];
-      hes[i] += r * slice_i[2];
+      resid[2*i+d] = r = p[i].x[d] - slice_i[0]; //x*-x
+      jac[4*i+2*d+de] = slice_i[1]; //dxdt and dydt
+      hes[i] += r * slice_i[2]; //d2x/dt2 + d2y/dt2
     }
   }
   for(i=1;i<pn;++i) memcpy(wt+i*n, wt+3*i*n, n*sizeof(double));
   for(d=0;d<2;++d) {
     tensor_mtxv(slice,pn, wt, edge->dxdn[d],n);
-    for(i=0;i<pn;++i) jac[4*i+2*d+dn] = slice[i];
+    for(i=0;i<pn;++i) jac[4*i+2*d+dn] = slice[i]; //dxdn and dydn
   }
+
   /* perform Newton step */
   for(i=0;i<pn;++i) {
     double *const resid_i=resid+2*i, *const jac_i=jac+4*i, *const hes_i=hes+i;
@@ -753,6 +775,7 @@ void findpts_el_2(struct findpts_el_data_2 *const fd, const unsigned npt,
     }
   }
   while(nconv && step++ < 50) {
+//    printf("Newton iter %u\n",step);
     /* advance each group of points */
     struct findpts_el_pt_2 *p, *const pe=pstart+nconv, *pout; unsigned pn;
     
@@ -767,6 +790,7 @@ void findpts_el_2(struct findpts_el_data_2 *const fd, const unsigned npt,
     for(p=pstart,pout=pbuf; p!=pe; p+=pn,pout+=pn) {
       const unsigned pflags = p->flags & FLAG_MASK;
       pn = count[pt_flags_to_bin_noC(pflags)];
+//      printf("flags %u\n",pflags);
       fun[num_constrained(pflags)](pout, fd, p,pn, tol);
     }
     /* group points by contsraints */

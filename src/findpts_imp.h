@@ -41,6 +41,9 @@
 #define findpts_local_eval    TOKEN_PASTE(PREFIXED_NAME(findpts_local_eval_ ),D)
 #define setup_fev_aux         TOKEN_PASTE(setup_fev_aux_,D)
 
+
+#define printit_int_fpt   TOKEN_PASTE(printit_int_fpt ,D)
+
 struct hash_data {
   ulong hash_n;
   struct dbl_range bnd[D];
@@ -204,6 +207,7 @@ static void hash_build(struct hash_data *const p,
   free(local_mask);
   sarray_transfer(struct proc_index,&hash,proc,1,cr);
   table_from_hash(p,&hash,cr->comm.np,&cr->data);
+//  printf("%u %u-k10finalsize\n",hash_size,p->hash_n);
   array_free(&hash);
 }
 
@@ -223,6 +227,21 @@ struct findpts_data {
   uint   fevsetup;
 };
 
+void printit_int_fpt(const uint *p, const int size, char *myString)
+{
+    printf("Printing in fpt loc imp %s\n",myString);
+    for (int i = 0; i < size;)
+    {
+        for (int j = 0; j < 8 && i < size; j++)
+        {
+            printf("%u ",p[i]);
+            i++;
+        }
+        printf("\n");
+    }
+}
+
+
 static void setupms_aux(
   struct findpts_data *const fd,
   const double *const elx[D],
@@ -238,6 +257,21 @@ static void setupms_aux(
   hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,
              global_hash_size,&fd->cr);
   fd->fevsetup = 0;
+//  {
+//      const uint np = fd->cr.comm.np, id=fd->cr.comm.id;
+//      const uint ncells = fd->hash.hash_n*fd->hash.hash_n;
+//      const uint nents = ncells/np;
+//      const uint size = fd->hash.offset[nents];
+//      for (int i = 0; i < np; i++)
+//      {
+//          if (i == id)
+//          {
+//              printf("%u %u - printing from rank\n",id,size);
+//              printit_int_fpt(fd->hash.offset,size,"fd->has from rank");
+//          }
+//          MPI_Barrier(MPI_COMM_WORLD);
+//      }
+//  }
 }
 
 struct findpts_data *findptsms_setup(
@@ -331,6 +365,7 @@ void findptsms(        uint   *const        code_base, const unsigned       code
     hash_pt.n = pt - (struct src_pt*)hash_pt.ptr;
     sarray_transfer(struct src_pt,&hash_pt,proc,1,&fd->cr);
   }
+
   /* look up points in hash cells, route to possible procs */
   {
     const uint *const hash_offset = fd->hash.offset;

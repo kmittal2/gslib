@@ -63,6 +63,44 @@
 
   --------------------------------------------------------------------------*/
 
+#define printit_obbox_dbl_range_fptloc   TOKEN_PASTE(printit_obbox_dbl_range_fptloc ,D)
+#define printit_fptloc   TOKEN_PASTE(printit_fptloc ,D)
+#define printit_int_fptloc   TOKEN_PASTE(printit_int_fptloc ,D)
+
+void printit_fptloc(const double *p, const int size, char *myString)
+{
+    printf("Printing in fpt loc imp %s\n",myString);
+    for (int i = 0; i < size;)
+    {
+        for (int j = 0; j < 8 && i < size; j++)
+        {
+            printf("%g ",p[i]);
+            i++;
+        }
+        printf("\n");
+    }
+}
+
+void printit_int_fptloc(const uint *p, const int size, char *myString)
+{
+    printf("Printing in fpt loc imp %s\n",myString);
+    for (int i = 0; i < size;)
+    {
+        for (int j = 0; j < 8 && i < size; j++)
+        {
+            printf("%u ",p[i]);
+            i++;
+        }
+        printf("\n");
+    }
+}
+
+void printit_obbox_dbl_range_fptloc(const struct dbl_range *p, char *myString)
+{
+    printf("Printing dbl_range in fpt loc imp %s\n",myString);
+    printf("%g %g\n",p->min,p->max);
+}
+
 struct hash_data {
   uint hash_n;
   struct dbl_range bnd[D];
@@ -104,29 +142,42 @@ static uint hash_count(struct hash_data *p,
 {
   uint i,count=0;
   hash_setfac(p,n);
+//  printf("%u %u - Get hash count \n",nel,n);
   for(i=0;i<nel;++i) {
     struct uint_range ir; uint ci; unsigned d;
       ir=hash_range(p,0,obb[i].x[0]); ci  = ir.max-ir.min;
-    for(d=1;d<D;++d)
+//    printf("%u %u %u - Get hash count \n",i,0,ir.max-ir.min);
+    for(d=1;d<D;++d) {
       ir=hash_range(p,d,obb[i].x[d]), ci *= ir.max-ir.min;
+//      printf("%u %u %u - Get hash count d \n",i,d,ir.max-ir.min);
+    }
     count+=ci;
   }
+//  printf("%u - Total count\n",count);
   return count;
 }
 
-static uint hash_opt_size(struct hash_data *p,
+uint hash_opt_size(struct hash_data *p,
                           const struct obbox *const obb, const uint nel,
                           const uint max_size)
 {
   uint nl=1, nu=ceil(pow(max_size-nel,1.0/D));
   uint size_low=2+nel;
+//  printit_int_fptloc(&nel, 1, "nel");
+//  printit_int_fptloc(&max_size, 1, "max_size");
+//  printit_int_fptloc(&nl, 1, "nl");
+//  printit_int_fptloc(&nu, 1, "nu");
   while(nu-nl>1) {
     uint nm = nl+(nu-nl)/2, nmd = nm*nm, size;
     WHEN_3D(nmd *= nm);
     size = nmd+1+hash_count(p,obb,nel,nm);
+//    printf("%u %u %u %u- intermediate nl nu nm size\n",nl,nu,nm,size);
     if(size<=max_size) nl=nm,size_low=size; else nu=nm;
   }
   hash_setfac(p,nl);
+//  printit_int_fptloc(&nl, 1, "nl-final");
+//  printit_int_fptloc(&nu, 1, "nu-final");
+//  printit_int_fptloc(&size_low, 1, "size-low-final");
   return size_low;
 }
 
@@ -137,13 +188,20 @@ static void hash_bb(struct hash_data *p,
   struct dbl_range bnd[D];
   if(nel) {
     for(d=0;d<D;++d) bnd[d]=obb[0].x[d];
-    for(el=1;el<nel;++el)
-      for(d=0;d<D;++d)
+//    printit_obbox_dbl_range_fptloc(&bnd[0], "initial hash bb x");
+//    printit_obbox_dbl_range_fptloc(&bnd[1], "initial hash bb y");
+    for(el=1;el<nel;++el) {
+      for(d=0;d<D;++d) {
         bnd[d]=dbl_range_merge(bnd[d],obb[el].x[d]);
+      }
+//      printit_obbox_dbl_range_fptloc(&bnd[0], "evolving hash bb x");
+//      printit_obbox_dbl_range_fptloc(&bnd[1], "evolving hash bb y");
+    }
     for(d=0;d<D;++d) p->bnd[d]=bnd[d];
   } else {
     for(d=0;d<D;++d) p->bnd[d].max=p->bnd[d].min=0;
   }
+//  printf("%f %f %f %f %f %f - k10-hashbounds-\n",p->bnd[0].min,p->bnd[0].max,p->bnd[1].min,p->bnd[1].max,p->bnd[2].min,p->bnd[2].max);
 }
 
 static void hash_build(struct hash_data *p,
@@ -171,10 +229,12 @@ static void hash_build(struct hash_data *p,
   }
   sum=hnd+1, max=count[0];
   p->offset[0]=sum;
+//  printf("%u %u k10-setup offset\n",sum,max);
   for(i=0;i<hnd;++i) {
     max = count[i]>max?count[i]:max;
     sum += count[i];
     p->offset[i+1] = sum;
+//    printf("%u %u %u %u k10-computing offset\n",i,p->offset[i+1],sum,max);
   }
   p->max = max;
   for(el=0;el<nel;++el) {
@@ -192,6 +252,10 @@ static void hash_build(struct hash_data *p,
     FOR_LOOP();
     #undef FOR_LOOP
   }
+//  printit_int_fptloc(p->offset,size,"p->offset");
+//  printit_obbox_dbl_range_fptloc(&p->bnd[0], "final hash bb x");
+//  printit_obbox_dbl_range_fptloc(&p->bnd[1], "final hash bb y");
+//  printf("%g %g %u %u final fac and max and hash_n \n",p->fac[0],p->fac[1],p->max,p->hash_n);
   free(count);
 }
 
@@ -200,11 +264,11 @@ static void hash_free(struct hash_data *p) { free(p->offset); }
 struct findpts_local_data {
   unsigned ntot;
   const double *elx[D];
-  const unsigned *nsid;
   struct obbox *obb;
   struct hash_data hd;
   struct findpts_el_data fed;
   double tol;
+  const unsigned *nsid;
   double *distrsti;
   const double *distfint;
   uint ims;
@@ -273,6 +337,7 @@ static void map_points_to_els(
     { const uint hi = hash_index(&fd->hd,x);
       const uint       *elp = fd->hd.offset + fd->hd.offset[hi  ],
                  *const ele = fd->hd.offset + fd->hd.offset[hi+1];
+//      printf("%u %u %u - k10info\n",hi,*elp,*ele);
       *code = CODE_NOT_FOUND;
       for(; elp!=ele; ++elp) {
         const uint el = *elp;

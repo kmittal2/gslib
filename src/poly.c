@@ -219,6 +219,7 @@ unsigned gll_lag_size(unsigned n)
   return (n<=GLL_LAG_FIX_MAX?1:9)*n;
 }
 
+// Fills data (should be of size n)
 lagrange_fun *gll_lag_setup(double *restrict data, int n)
 {
   double *z, *w, *p;
