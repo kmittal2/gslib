@@ -14,6 +14,9 @@
 #define obbox_calc_2  PREFIXED_NAME(obbox_calc_2)
 #define obbox_calc_3  PREFIXED_NAME(obbox_calc_3)
 
+#define obboxsurf_calc_2 PREFIXED_NAME(obboxsurf_calc_2)
+#define obboxsurf_calc_3 PREFIXED_NAME(obboxsurf_calc_3)
+
 struct obbox_2 { double c0[2], A[4];
                  struct dbl_range x[2]; };
 
@@ -132,7 +135,7 @@ void printit(const double *p, const int size, char *myString)
     printf("Printing %s\n",myString);
     for (int i = 0; i < size;)
     {
-        for (int j = 0; j < 8 && i < size; j++)
+        for (int j = 0; j < 16 && i < size; j++)
         {
             printf("%g ",p[i]);
             i++;
@@ -388,3 +391,218 @@ void obbox_calc_3(struct obbox_3 *out,
   free(data);
 }
 
+static struct dbl_range dblsurf_range_expand(struct dbl_range b, double tol)
+{
+  double a = (b.min+b.max)/2, l = (b.max-b.min)*(1+tol)/2;
+  if((b.max-b.min)<1e-6) l = 1e-6;  // FIXME: Just some arbitrary tolerance for now
+  struct dbl_range m;
+  m.min = a-l, m.max = a+l;
+  return m;
+}
+
+void obboxsurf_calc_2(        struct obbox_2 *out,
+                       const double *const elx[2],
+                              const unsigned n[1],
+                                         uint nel,
+                              const unsigned m[1],
+                                 const double tol )
+{
+  const double *x = elx[0], *y = elx[1];
+  const unsigned nr = n[0];
+  const unsigned mr = m[0];
+
+  double *data;
+  const unsigned lbsize0 = lob_bnd_size(nr,mr);
+
+  unsigned wsize = 2*nr+2*mr;
+  DO_MAX(wsize,gll_lag_size(nr));
+
+  // A big vector that stores all data related to bounds and all the work arrays
+  data = tmalloc(double, 2*nr + lbsize0 + wsize);
+
+  printf("nel %u, lbsize0 %u\n", nel, lbsize0);
+  printit(x, nel*nr, "x coordinates");
+  printit(y, nel*nr, "y coordinates");
+
+  {
+    double *const I0r = data,                          // 2*nr doubles
+           *const lob_bnd_data_r = data + 2*nr,        // lbsize0 doubles
+           *const work = data + 2*nr + lbsize0;        // wsize doubles
+
+    /*
+    1. lag would store a pointer to a function of type lagrange_fun, pointing to
+       the correct function to evaluate the lagrange polynomials on nr GLL nodes
+    1. gll_lag_setup returns correct lag_coeff function and lag_coeffs in work
+    2. I0##r stores lag_coeffs for d=1, work already has lag_coeffs for d=0, n=n##r, d=1, xh=0
+    3. lob_bnd_setup assigns to lob_bnd_data_##r, which is used to compute bounds
+
+    It seems all operations here are independently done for r and s! so safe?
+    */
+    #define SETUP_DIR(r) do { \
+      lagrange_fun *const lag = gll_lag_setup(work, n##r); \
+      lag(I0##r, work,n##r,1, 0); \
+      lob_bnd_setup(lob_bnd_data_##r, n##r,m##r); \
+    } while(0)
+    
+    SETUP_DIR(r);
+    
+    #undef SETUP_DIR
+
+    printit(lob_bnd_data_r, lbsize0, "lob_bnd_data_r");
+
+    // Loop over all elements, every iteration, x and y pointers are incremented
+    // by total number of dofs
+    for(;nel;--nel,x+=nr,y+=nr,++out) {
+      double x0[2], J[4], Ji[4];
+      struct dbl_range ab[2], tb[2];
+
+      /* double work[2*m##r] */
+      #define DO_BOUND(bnd,merge,r,x,work) do { \
+        struct dbl_range b = \
+        lob_bnd_1(lob_bnd_data_##r,n##r,m##r, x, work); \
+        if(merge) bnd=dbl_range_merge(bnd,b); else bnd=b; \
+      } while(0)
+
+      /* double work[2*n##r + 2*m##r] */
+      /*
+      1. find bounds for x coords of an element, store in ab[0]
+      2. find bounds for y coords of an element, store in ab[1]
+      Merge is set to 0 for all Do_EDGE calls for us
+      */
+      #define DO_EDGE(merge,r,x,y,work) do { \
+        DO_BOUND(ab[0],merge,r,x,work); \
+        DO_BOUND(ab[1],merge,r,y,work); \
+      } while(0)
+      DO_EDGE(0,r,x,y,work);  // the first edge according to lexicographic order, i.e. "bottom" edge
+      // printit_obbox_dbl_range(&ab[0],"ab0-E0");
+      // printit_obbox_dbl_range(&ab[1],"ab1");
+      #undef DO_EDGE
+      #undef DO_BOUND
+
+      out->x[0] = dblsurf_range_expand(ab[0],tol),
+      out->x[1] = dblsurf_range_expand(ab[1],tol);
+      printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
+      printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
+    }
+  }
+  
+  free(data);  
+}
+       
+void obboxsurf_calc_3(        struct obbox_3 *out,
+                       const double *const elx[3],
+                              const unsigned n[2],
+                                         uint nel,
+                              const unsigned m[2],
+                                 const double tol )
+{
+  const double *x = elx[0], *y = elx[1], *z = elx[2];
+  const unsigned nr = n[0], ns = n[1];
+  const unsigned mr = m[0], ms = m[1];
+
+  const unsigned nrs = nr*ns;
+  double *data;
+  const unsigned lbsize0 = lob_bnd_size(nr,mr),
+                 lbsize1 = lob_bnd_size(ns,ms);
+  // unsigned wsize = 3*nr*ns+2*mr*(ns+ms+1);
+  // DO_MAX(wsize,6*nr*nt+2*mr*(nt+mt+1));
+  // DO_MAX(wsize,6*ns*nt+2*ms*(nt+mt+1));
+  // DO_MAX(wsize,2*nr*ns+3*nr);
+  // DO_MAX(wsize,gll_lag_size(nr));
+  // DO_MAX(wsize,gll_lag_size(ns));
+  // DO_MAX(wsize,gll_lag_size(nt));
+  // data = tmalloc(double, 2*(nr+ns+nt)+lbsize0+lbsize1+lbsize2+wsize);
+
+  // {
+  //   double *const I0r = data, *const I0s = I0r+2*nr, *const I0t = I0s+2*ns;
+  //   double *const lob_bnd_data_r = data+2*(nr+ns+nt),
+  //          *const lob_bnd_data_s = data+2*(nr+ns+nt)+lbsize0,
+  //          *const lob_bnd_data_t = data+2*(nr+ns+nt)+lbsize0+lbsize1;
+  //   double *const work = data+2*(nr+ns+nt)+lbsize0+lbsize1+lbsize2;
+    
+  //   #define SETUP_DIR(r) do { \
+  //     lagrange_fun *const lag = gll_lag_setup(work, n##r); \
+  //     lag(I0##r, work,n##r,1, 0); \
+  //     lob_bnd_setup(lob_bnd_data_##r, n##r,m##r); \
+  //   } while(0)
+    
+  //   SETUP_DIR(r); SETUP_DIR(s); SETUP_DIR(t);
+    
+  //   #undef SETUP_DIR
+    
+  //   for(;nel;--nel,x+=nrst,y+=nrst,z+=nrst,++out) {
+  //     double x0[3], J[9], Ji[9];
+  //     struct dbl_range ab[3], tb[3];
+  
+  //     /* double work[2*nrs+3*nr] */
+  //     #define EVAL_AT_0(d,x) \
+  //       x0[d] = tensor_ig3(J+3*d, I0r,nr, I0s,ns, I0t,nt, x, work)
+  //     EVAL_AT_0(0,x); EVAL_AT_0(1,y); EVAL_AT_0(2,z);                          
+  //     mat_inv_3(Ji, J);
+  //     #undef EVAL_AT_0
+ 
+  //     /* double work[2*m##r*(n##s+m##s+1)] */
+  //     #define DO_BOUND(bnd,merge,r,s,x,work) do { \
+  //       struct dbl_range b = \
+  //       lob_bnd_2(lob_bnd_data_##r,n##r,m##r, \
+  //                 lob_bnd_data_##s,n##s,m##s, x, work); \
+  //       if(merge) bnd=dbl_range_merge(bnd,b); else bnd=b; \
+  //     } while(0)
+
+  //     /* double work[3*n##r*n##s+2*m##r*(n##s+m##s+1)] */
+  //     #define DO_FACE(merge,r,s,x,y,z,work) do { \
+  //       DO_BOUND(ab[0],merge,r,s,x,work); \
+  //       DO_BOUND(ab[1],merge,r,s,y,work); \
+  //       DO_BOUND(ab[2],merge,r,s,z,work); \
+  //       bbox_3_tfm(work, x0,Ji, x,y,z,n##r*n##s); \
+  //       DO_BOUND(tb[0],merge,r,s,(work)            ,(work)+3*n##r*n##s); \
+  //       DO_BOUND(tb[1],merge,r,s,(work)+  n##r*n##s,(work)+3*n##r*n##s); \
+  //       DO_BOUND(tb[2],merge,r,s,(work)+2*n##r*n##s,(work)+3*n##r*n##s); \
+  //     } while(0)
+
+  //     DO_FACE(0,r,s,x,y,z,work);
+  //     DO_FACE(1,r,s,&x[nrst-nrs],&y[nrst-nrs],&z[nrst-nrs],work);
+
+  //     /* double work[6*n##r*n##s+2*m##r*(n##s+m##s+1)] */
+  //     #define GET_FACE(r,s,off,n1,n2,n3) do { \
+  //       copy_strided(work            , x+off,n1,n2,n3); \
+  //       copy_strided(work+  n##r*n##s, y+off,n1,n2,n3); \
+  //       copy_strided(work+2*n##r*n##s, z+off,n1,n2,n3); \
+  //       DO_FACE(1,r,s,work,work+n##r*n##s,work+2*n##r*n##s,work+3*n##r*n##s); \
+  //     } while(0)
+  
+  //     GET_FACE(r,t,0     ,nr,ns,nt);
+  //     GET_FACE(r,t,nrs-nr,nr,ns,nt);
+  //     GET_FACE(s,t,0     , 1,nr,ns*nt);
+  //     GET_FACE(s,t,nr-1  , 1,nr,ns*nt);
+      
+  //     #undef GET_FACE
+  //     #undef DO_FACE
+  //     #undef DO_BOUND
+
+  //     out->x[0] = dbl_range_expand(ab[0],tol),
+  //     out->x[1] = dbl_range_expand(ab[1],tol);
+  //     out->x[2] = dbl_range_expand(ab[2],tol);
+  
+  //     {
+  //       const double av0 = (tb[0].min+tb[0].max)/2,
+  //                    av1 = (tb[1].min+tb[1].max)/2,
+  //                    av2 = (tb[2].min+tb[2].max)/2;
+  //       out->c0[0] = x0[0] + J[0]*av0 + J[1]*av1 + J[2]*av2;
+  //       out->c0[1] = x0[1] + J[3]*av0 + J[4]*av1 + J[5]*av2;
+  //       out->c0[2] = x0[2] + J[6]*av0 + J[7]*av1 + J[8]*av2;
+  //     }
+  //     {
+  //       const double di0 = 2/((1+tol)*(tb[0].max-tb[0].min)),
+  //                    di1 = 2/((1+tol)*(tb[1].max-tb[1].min)),
+  //                    di2 = 2/((1+tol)*(tb[2].max-tb[2].min));
+  //       out->A[0]=di0*Ji[0], out->A[1]=di0*Ji[1], out->A[2]=di0*Ji[2];
+  //       out->A[3]=di1*Ji[3], out->A[4]=di1*Ji[4], out->A[5]=di1*Ji[5];
+  //       out->A[6]=di2*Ji[6], out->A[7]=di2*Ji[7], out->A[8]=di2*Ji[8];
+  //     }
+
+  //   }
+  // }
+  
+  // free(data);
+}

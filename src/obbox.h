@@ -8,6 +8,8 @@
 #define obbox_calc_2  PREFIXED_NAME(obbox_calc_2)
 #define obbox_calc_3  PREFIXED_NAME(obbox_calc_3)
 
+#define obboxsurf_calc_2 PREFIXED_NAME(obboxsurf_calc_2)
+#define obboxsurf_calc_3 PREFIXED_NAME(obboxsurf_calc_3)
 /*--------------------------------------------------------------------------
    Oriented and axis-aligned bounding box computation for spectral elements
    
@@ -64,6 +66,20 @@ void obbox_calc_3(struct obbox_3 *out,
                   const double *const elx[3],
                   const unsigned n[3], uint nel,
                   const unsigned m[3], const double tol);
+
+void obboxsurf_calc_2(        struct obbox_2 *out,
+                       const double *const elx[2],
+                              const unsigned n[1],
+                                         uint nel,
+                              const unsigned m[1],
+                                 const double tol );
+
+void obboxsurf_calc_3(        struct obbox_3 *out,
+                       const double *const elx[3],
+                              const unsigned n[2],
+                                         uint nel,
+                              const unsigned m[2],
+                                 const double tol );
 
 /* positive when possibly inside */
 static double obbox_axis_test_2(const struct obbox_2 *const b,

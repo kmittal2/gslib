@@ -23,6 +23,11 @@
 #define findpts_3         PREFIXED_NAME(findpts_3      )
 #define findpts_eval_3    PREFIXED_NAME(findpts_eval_3 )
 
+#define findptssurfms_setup_2 PREFIXED_NAME(findptssurfms_setup_2)
+#define findptssurfms_setup_3 PREFIXED_NAME(findptssurfms_setup_3)
+#define findptssurf_setup_2   PREFIXED_NAME(findptssurf_setup_2)
+#define findptssurf_setup_3   PREFIXED_NAME(findptssurf_setup_3)
+
 struct findpts_data_2;
 struct findpts_data_3;
 
@@ -35,6 +40,19 @@ struct findpts_data_2 *findptsms_setup_2(
   const unsigned npt_max, const double newt_tol, 
   const uint *const nsid, const double *const distfint);
 
+struct findpts_data_2 *findptssurfms_setup_2( const struct comm *const comm,
+                                               const double *const elx[2],
+                                                      const unsigned n[2],
+                                                           const uint nel,
+                                                      const unsigned m[2],
+                                                    const double bbox_tol,
+                                               const uint local_hash_size,
+                                              const uint global_hash_size,
+                                                   const unsigned npt_max,
+                                                    const double newt_tol, 
+                                                   const uint *const nsid,
+                                              const double *const distfint );
+
 struct findpts_data_3 *findptsms_setup_3(
   const struct comm *const comm,
   const double *const elx[3],
@@ -43,6 +61,19 @@ struct findpts_data_3 *findptsms_setup_3(
   const uint local_hash_size, const uint global_hash_size,
   const unsigned npt_max, const double newt_tol,
   const uint *const nsid, const double *const distfint);
+
+struct findpts_data_3 *findptssurfms_setup_3( const struct comm *const comm,
+                                               const double *const elx[3],
+                                                      const unsigned n[3],
+                                                           const uint nel,
+                                                      const unsigned m[3],
+                                                    const double bbox_tol,
+                                               const uint local_hash_size,
+                                              const uint global_hash_size,
+                                                   const unsigned npt_max,
+                                                    const double newt_tol,
+                                                   const uint *const nsid,
+                                              const double *const distfint );
 
 void findptsms_free_2(struct findpts_data_2 *fd);
 void findptsms_free_3(struct findpts_data_3 *fd);
@@ -93,6 +124,17 @@ struct findpts_data_2 *findpts_setup_2(
   const uint local_hash_size, const uint global_hash_size,
   const unsigned npt_max, const double newt_tol);
 
+struct findpts_data_2 *findptssurf_setup_2( const struct comm *const comm,
+                                             const double *const elx[2],
+                                                    const unsigned n[2],
+                                                         const uint nel,
+                                                    const unsigned m[2],
+                                                  const double bbox_tol,
+                                             const uint local_hash_size,
+                                            const uint global_hash_size,
+                                                 const unsigned npt_max,
+                                                  const double newt_tol );
+
 struct findpts_data_3 *findpts_setup_3(
   const struct comm *const comm,
   const double *const elx[3],
@@ -100,6 +142,17 @@ struct findpts_data_3 *findpts_setup_3(
   const unsigned m[3], const double bbox_tol,
   const uint local_hash_size, const uint global_hash_size,
   const unsigned npt_max, const double newt_tol);
+
+struct findpts_data_3 *findptssurf_setup_3( const struct comm *const comm,
+                                             const double *const elx[3],
+                                                    const unsigned n[3],
+                                                         const uint nel,
+                                                    const unsigned m[3],
+                                                  const double bbox_tol,
+                                             const uint local_hash_size,
+                                            const uint global_hash_size,
+                                                 const unsigned npt_max,
+                                                  const double newt_tol );
 
 void findpts_free_2(struct findpts_data_2 *fd);
 void findpts_free_3(struct findpts_data_3 *fd);

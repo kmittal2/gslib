@@ -31,6 +31,10 @@
 #define findpts_local_free  TOKEN_PASTE(PREFIXED_NAME(findpts_local_free_ ),D)
 #define findpts_local       TOKEN_PASTE(PREFIXED_NAME(findpts_local_      ),D)
 #define findpts_local_eval  TOKEN_PASTE(PREFIXED_NAME(findpts_local_eval_ ),D)
+
+#define findptssurfms_local_setup TOKEN_PASTE(PREFIXED_NAME(findptssurfms_local_setup_),D)
+#define findptssurf_local_setup   TOKEN_PASTE(PREFIXED_NAME(findptssurf_local_setup_),D)
+#define obboxsurf_calc           TOKEN_PASTE(PREFIXED_NAME(obboxsurf_calc_),D)
 /*--------------------------------------------------------------------------
    Point to Possible Elements Hashing
 
@@ -300,6 +304,37 @@ void findptsms_local_setup(struct findpts_local_data *const fd,
   }
 }
 
+void findptssurfms_local_setup( struct findpts_local_data *const fd,
+                                       const double *const elx[D],
+                                       const unsigned *const nsid,
+                                      const double *const distfint,
+                                            const unsigned n[D-1],
+                                                   const uint nel,
+                                            const unsigned m[D-1],
+                                            const double bbox_tol,
+                                         const uint max_hash_size,
+                                           const unsigned npt_max,
+                                            const double newt_tol,
+                                                   const uint ims )
+{
+  unsigned d;
+  unsigned ntot=n[0]; for(d=1;d<D-1;++d) ntot*=n[d];
+  fd->ntot = ntot;
+  for(d=0;d<D;++d) fd->elx[d]=elx[d];
+  printf("dim,n[0],m[0],nel: %d %u %u %u\n", D-1, n[0],m[0],nel);
+  fd->nsid = nsid;
+  fd->obb=tmalloc(struct obbox,nel);  // obbox struct stores bbox info for each element
+  obboxsurf_calc(fd->obb,elx,n,nel,m,bbox_tol);
+  // hash_build(&fd->hd,fd->obb,nel,max_hash_size);
+  // findpts_el_setup(&fd->fed,n,npt_max);
+  // fd->tol = newt_tol;
+  // fd->ims = ims;
+  // if (fd->ims==1) {
+  //  fd->distrsti = tmalloc(double, npt_max);
+  //  fd->distfint = distfint;
+  // }
+}
+
 void findptsms_local_free(struct findpts_local_data *const fd)
 {
   findpts_el_free(&fd->fed);
@@ -484,6 +519,33 @@ void findpts_local_setup(struct findpts_local_data *const fd,
                         npt_max,newt_tol,ims);
 }
 
+void findptssurf_local_setup( struct findpts_local_data *const fd,
+                                     const double *const elx[D],
+                                          const unsigned n[D-1],
+                                                 const uint nel,
+                                          const unsigned m[D-1],
+                                          const double bbox_tol,
+                                       const uint max_hash_size,
+                                         const unsigned npt_max,
+                                          const double newt_tol )
+{
+  uint ims          = 0;
+  unsigned int nsid = 0;
+  double distfint    = 0.;
+  findptssurfms_local_setup(             fd,
+                                       elx,
+                                     &nsid,
+                                  &distfint,
+                                         n,
+                                       nel,
+                                         m,
+                                  bbox_tol,
+                             max_hash_size,
+                                   npt_max,
+                                  newt_tol,
+                                       ims);
+}
+
 void findpts_local_free(struct findpts_local_data *const fd)
 {
   findptsms_local_free(fd);
@@ -573,3 +635,7 @@ void findpts_local_eval(
 #undef findpts_local_free
 #undef findpts_local_setup
 #undef findpts_local_eval
+
+#undef findptssurfms_local_setup
+#undef findptssurf_local_setup
+#undef obboxsurf_calc
