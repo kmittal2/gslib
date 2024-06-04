@@ -390,9 +390,8 @@ void obbox_calc_3(struct obbox_3 *out,
   free(data);
 }
 
-
 void printit_coords( const double *x, const double *y, const double *z,
-                     const int npts , const int dim  , char *myString)
+                      const int npts,   const int dim,  char *myString )
 {
   printf("Printing coords %s\n",myString);
   for (int i = 0; i < npts; i++)
@@ -407,7 +406,7 @@ void printit_coords( const double *x, const double *y, const double *z,
 static struct dbl_range dblsurf_range_expand(struct dbl_range b, double tol)
 {
   double a = (b.min+b.max)/2, l = (b.max-b.min)*(1+tol)/2;
-  if((b.max-b.min)<1e-6) l = 1e-2;  // FIXME: Just some arbitrary tolerance for now
+  if((b.max-b.min)<1e-6) l = 1e-1/2;  // FIXME: Just some arbitrary tolerance for now
   struct dbl_range m;
   m.min = a-l, m.max = a+l;
   return m;
@@ -420,10 +419,10 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
                               const unsigned m[1],
                                  const double tol )
 {
-  const double *x = elx[0],
-               *y = elx[1];
-  const unsigned nr = n[0];
-  const unsigned mr = m[0];
+  const double   *x = elx[0],
+                 *y = elx[1];
+  const unsigned nr = n[0],
+                 mr = m[0];
 
   double *data;
   const unsigned lbsize0 = lob_bnd_size(nr,mr);

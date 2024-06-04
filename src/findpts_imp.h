@@ -313,8 +313,7 @@ struct findpts_data *findptssurfms_setup( const struct comm *const comm,
   crystal_init(&fd->cr,comm);
   findptssurfms_local_setup(&fd->local,elx,nsid,distfint,n,nel,m,bbox_tol,local_hash_size,
                            npt_max, newt_tol,ims);
-  hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,
-             global_hash_size,&fd->cr);
+  // hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,global_hash_size,&fd->cr);
   fd->fevsetup = 0;
   return fd;
 }
@@ -726,6 +725,7 @@ struct findpts_data *findptssurf_setup( const struct comm *const comm,
                            npt_max, newt_tol,ims);
   hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,global_hash_size,&fd->cr);
   fd->fevsetup = 0;
+  printf("findptssurf_setup done\n");
   return fd;
 }
 

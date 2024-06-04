@@ -325,14 +325,15 @@ void findptssurfms_local_setup( struct findpts_local_data *const fd,
   fd->nsid = nsid;
   fd->obb=tmalloc(struct obbox,nel);  // obbox struct stores bbox info for each element
   obboxsurf_calc(fd->obb,elx,n,nel,m,bbox_tol);
-  // hash_build(&fd->hd,fd->obb,nel,max_hash_size);
+  hash_build(&fd->hd,fd->obb,nel,max_hash_size);
   // findpts_el_setup(&fd->fed,n,npt_max);
-  // fd->tol = newt_tol;
-  // fd->ims = ims;
-  // if (fd->ims==1) {
-  //  fd->distrsti = tmalloc(double, npt_max);
-  //  fd->distfint = distfint;
-  // }
+  fd->tol = newt_tol;
+  fd->ims = ims;
+  if (fd->ims==1) {
+   fd->distrsti = tmalloc(double, npt_max);
+   fd->distfint = distfint;
+  }
+  printf("findptssurfms_local_setup done\n");
 }
 
 void findptsms_local_free(struct findpts_local_data *const fd)
