@@ -121,6 +121,8 @@ static uint hash_index(const struct hash_data *p, const double x[D])
                    +hash_index_aux(p->bnd[0].min,p->fac[0],n,x[0]);
 }
 
+/* Property of the hash mesh, the number of hash indices per unit length in each
+ * dimension */
 static void hash_setfac(struct hash_data *p, const uint n)
 {
   unsigned d;
@@ -128,6 +130,23 @@ static void hash_setfac(struct hash_data *p, const uint n)
   for(d=0;d<D;++d) p->fac[d] = n/(p->bnd[d].max-p->bnd[d].min);
 }
 
+/* Hash cells that have contributions from an obbox with range r, i.e. its
+ * AABB. Equal to the number of hash cells that need to be "traversed" from the
+ * hash mesh's lower bound to reach the lower and upper bounds of the obbox or
+ * the hash mesh itself.
+ * 
+ *   hashmin      obbox          hashmax
+ *      |        |<--->|            |  
+ *      |-|-|-|-|-|-|-|-|-|-|-|-|-|-|  
+ *      |<----->|       |           |
+ *      | nlow=4        |           |
+ *      |<------------->|           |
+ *      |    nhigh=8                |
+ * 
+ * If the obbox's lower bound is less than the hash mesh's lower bound, then 
+ * nlow=0. If the obbox's upper bound is greater than the hash mesh's upper
+ * bound, then nhigh=n.
+ */
 static struct uint_range hash_range(const struct hash_data *p, unsigned d,
                                     const struct dbl_range r)
 {
@@ -140,20 +159,26 @@ static struct uint_range hash_range(const struct hash_data *p, unsigned d,
   return ir;
 }
 
-static uint hash_count(struct hash_data *p,
-                       const struct obbox *const obb, const uint nel,
-                       const uint n)
+/* Total number of hash cells that would be contributed to by all AABBs. Can
+ * be greater than hash mesh cell count due to overlapping per-AABB hash 
+ * bounds.
+ */
+static uint hash_count(struct hash_data *p, const struct obbox *const obb,
+                       const uint nel, const uint n)
 {
   uint i,count=0;
-  hash_setfac(p,n);
+  hash_setfac(p,n);  // fac. required for hash_range
 //  printf("%u %u - Get hash count \n",nel,n);
   for(i=0;i<nel;++i) {
     struct uint_range ir; uint ci; unsigned d;
-      ir=hash_range(p,0,obb[i].x[0]); ci  = ir.max-ir.min;
-//    printf("%u %u %u - Get hash count \n",i,0,ir.max-ir.min);
+    // for AABB of element i, get the number of hash cells contributed in each
+    // dimension. Total hash cell count would be the product of per-dimension
+    // hash cell counts.
+    ir=hash_range(p,0,obb[i].x[0]); ci  = ir.max-ir.min;
+    // printf("%u %u %u - Get hash count \n",i,0,ir.max-ir.min);
     for(d=1;d<D;++d) {
       ir=hash_range(p,d,obb[i].x[d]), ci *= ir.max-ir.min;
-//      printf("%u %u %u - Get hash count d \n",i,d,ir.max-ir.min);
+      // printf("%u %u %u - Get hash count d \n",i,d,ir.max-ir.min);
     }
     count+=ci;
   }
@@ -161,37 +186,37 @@ static uint hash_count(struct hash_data *p,
   return count;
 }
 
+/* Array size needed to store the complete hash cells to element map.  Hash cell
+ * references would be repeated for multople obbox contributions.  Hence a cell
+ * is only associated with one element in the offset array, and hence is bigger
+ * than true count of hash cells.
+ */
 uint hash_opt_size(struct hash_data *p,
                           const struct obbox *const obb, const uint nel,
                           const uint max_size)
 {
   uint nl=1, nu=ceil(pow(max_size-nel,1.0/D));
   uint size_low=2+nel;
-//  printit_int_fptloc(&nel, 1, "nel");
-//  printit_int_fptloc(&max_size, 1, "max_size");
-//  printit_int_fptloc(&nl, 1, "nl");
-//  printit_int_fptloc(&nu, 1, "nu");
   while(nu-nl>1) {
     uint nm = nl+(nu-nl)/2, nmd = nm*nm, size;
     WHEN_3D(nmd *= nm);
     size = nmd+1+hash_count(p,obb,nel,nm);
-//    printf("%u %u %u %u- intermediate nl nu nm size\n",nl,nu,nm,size);
     if(size<=max_size) nl=nm,size_low=size; else nu=nm;
   }
-  hash_setfac(p,nl);
-//  printit_int_fptloc(&nl, 1, "nl-final");
-//  printit_int_fptloc(&nu, 1, "nu-final");
-//  printit_int_fptloc(&size_low, 1, "size-low-final");
+  hash_setfac(p,nl);  // hash->n is also set here
   return size_low;
 }
 
+/* The lowest and highest spatial bounds of the hash mesh that can accommodate
+ * all the obboxes.
+ */
 static void hash_bb(struct hash_data *p,
                     const struct obbox *const obb, const uint nel)
 {
   uint el; unsigned d;
   struct dbl_range bnd[D];
   if(nel) {
-    for(d=0;d<D;++d) bnd[d]=obb[0].x[d];
+    for(d=0;d<D;++d) bnd[d]=obb[0].x[d];  // initialize bnd with first element obbox bounds
 //    printit_obbox_dbl_range_fptloc(&bnd[0], "initial hash bb x");
 //    printit_obbox_dbl_range_fptloc(&bnd[1], "initial hash bb y");
     for(el=1;el<nel;++el) {
@@ -201,8 +226,9 @@ static void hash_bb(struct hash_data *p,
 //      printit_obbox_dbl_range_fptloc(&bnd[0], "evolving hash bb x");
 //      printit_obbox_dbl_range_fptloc(&bnd[1], "evolving hash bb y");
     }
-    for(d=0;d<D;++d) p->bnd[d]=bnd[d];
-  } else {
+    for(d=0;d<D;++d) p->bnd[d]=bnd[d];  // the final all-encompassing bounds for all elements
+  }
+  else {
     for(d=0;d<D;++d) p->bnd[d].max=p->bnd[d].min=0;
   }
 //  printf("%f %f %f %f %f %f - k10-hashbounds-\n",p->bnd[0].min,p->bnd[0].max,p->bnd[1].min,p->bnd[1].max,p->bnd[2].min,p->bnd[2].max);
@@ -213,12 +239,14 @@ static void hash_build(struct hash_data *p,
                        const uint max_size)
 {
   uint i,el,size,hn,hnd,sum,max, *count;
-  hash_bb(p,obb,nel);
-  size = hash_opt_size(p,obb,nel,max_size);
-  p->offset = tmalloc(uint,size);
-  hn = p->hash_n;
-  hnd = hn*hn; WHEN_3D(hnd*=hn);
+  hash_bb(p,obb,nel);                          // Get min-max spatial bounds for hash mesh
+  size = hash_opt_size(p,obb,nel,max_size);    // (hnd+1) + SUM (per obbox (i.e. element) hash cell count)
+  p->offset = tmalloc(uint,size);              // offset array to map hash cells to elements
+  hn = p->hash_n;                              // number of hash cells in each dimension
+  hnd = hn*hn; WHEN_3D(hnd*=hn);               // total number of hash cells
   count = tcalloc(uint,hnd);
+  // count the number of obboxes contributing to each hash cell and increment
+  // the corresponding index.
   for(el=0;el<nel;++el) {
     unsigned d; struct uint_range ir[D];
     for(d=0;d<D;++d) ir[d]=hash_range(p,d,obb[el].x[d]);
@@ -231,6 +259,8 @@ static void hash_build(struct hash_data *p,
     FOR_LOOP();
     #undef FOR_LOOP
   }
+  // Total count of obbox contributions for all hash cells prior to (i+1)th
+  // cell is stored in offset[i+1] temporarily. used in next FOR_LOOP.
   sum=hnd+1, max=count[0];
   p->offset[0]=sum;
 //  printf("%u %u k10-setup offset\n",sum,max);
@@ -240,10 +270,12 @@ static void hash_build(struct hash_data *p,
     p->offset[i+1] = sum;
 //    printf("%u %u %u %u k10-computing offset\n",i,p->offset[i+1],sum,max);
   }
-  p->max = max;
+  p->max = max;  // maximum number of obboxes that may contribute to a single hash cell
   for(el=0;el<nel;++el) {
     unsigned d; struct uint_range ir[D];
     for(d=0;d<D;++d) ir[d]=hash_range(p,d,obb[el].x[d]);
+    // loop over all hash cells that obbox of element el contributes to. The
+    // offset array maps a hash cell to a element.
     #define FOR_LOOP() do { uint i,j; WHEN_3D(uint k;) \
       WHEN_3D(for(k=ir[2].min;k<ir[2].max;++k)) \
               for(j=ir[1].min;j<ir[1].max;++j) \
@@ -321,7 +353,6 @@ void findptssurfms_local_setup( struct findpts_local_data *const fd,
   unsigned ntot=n[0]; for(d=1;d<D-1;++d) ntot*=n[d];
   fd->ntot = ntot;
   for(d=0;d<D;++d) fd->elx[d]=elx[d];
-  printf("dim,n[0],m[0],nel: %d %u %u %u\n", D-1, n[0],m[0],nel);
   fd->nsid = nsid;
   fd->obb=tmalloc(struct obbox,nel);  // obbox struct stores bbox info for each element
   obboxsurf_calc(fd->obb,elx,n,nel,m,bbox_tol);

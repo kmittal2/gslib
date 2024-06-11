@@ -427,7 +427,7 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
   double *data;
   const unsigned lbsize0 = lob_bnd_size(nr,mr);
 
-  printf("nel %u, lbsize0 %u\n", nel, lbsize0);
+  // printf("nel %u, lbsize0 %u\n", nel, lbsize0);
 
   unsigned wsize = 2*nr+2*mr;
   DO_MAX(wsize,gll_lag_size(nr));
@@ -463,8 +463,8 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
     // by total number of dofs
     uint nelorig = nel;
     for(;nel;--nel,x+=nr,y+=nr,++out) {
-      printf("nelID: %u\n", nelorig-nel);
-      printit_coords(x, y, NULL, nr, 2, "2D");
+      // printf("nelID: %u\n", nelorig-nel);
+      // printit_coords(x, y, NULL, nr, 2, "2D");
 
       struct dbl_range ab[2];
 
@@ -492,8 +492,8 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
       out->x[0] = dblsurf_range_expand(ab[0],tol),
       out->x[1] = dblsurf_range_expand(ab[1],tol);
 
-      printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
-      printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
+      // printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
+      // printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
     }
   }
   
@@ -516,7 +516,7 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
   const unsigned lbsize0 = lob_bnd_size(nr,mr),
                  lbsize1 = lob_bnd_size(ns,ms);
 
-  printf("nel %u, lbsize0 %u, lbsize1 %u\n", nel, lbsize0, lbsize1);
+  // printf("nel %u, lbsize0 %u, lbsize1 %u\n", nel, lbsize0, lbsize1);
 
   unsigned wsize = 3*nr*ns+2*mr*(ns+ms+1);
   DO_MAX(wsize,2*nr*ns+3*nr);
@@ -542,8 +542,8 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
     
     uint nelorig = nel;
     for(; nel; --nel,x+=nrs,y+=nrs,z+=nrs,++out) {
-      printf("nelID: %u\n", nelorig-nel);
-      printit_coords(x, y, z, nrs, 3, "3D");
+      // printf("nelID: %u\n", nelorig-nel);
+      // printit_coords(x, y, z, nrs, 3, "3D");
 
       struct dbl_range ab[3];
  
@@ -571,9 +571,9 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       out->x[1] = dblsurf_range_expand(ab[1],tol);
       out->x[2] = dblsurf_range_expand(ab[2],tol);
 
-      printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
-      printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
-      printit_obbox_dbl_range(&out->x[2],"ab2-expanded");
+      // printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
+      // printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
+      // printit_obbox_dbl_range(&out->x[2],"ab2-expanded");
     }
   }
   
