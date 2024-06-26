@@ -706,9 +706,9 @@ struct findpts_data *findpts_setup(
 
 struct findpts_data *findptssurf_setup( const struct comm *const comm,
                                          const double *const elx[D],
-                                                const unsigned n[D],
+                                              const unsigned n[D-1],
                                                      const uint nel,
-                                                const unsigned m[D],
+                                              const unsigned m[D-1],
                                               const double bbox_tol,
                                          const uint local_hash_size,
                                         const uint global_hash_size,
@@ -720,12 +720,30 @@ struct findpts_data *findptssurf_setup( const struct comm *const comm,
   fd->fdms.nsid    = 0;
   fd->fdms.distfint = 0;
   crystal_init(&fd->cr,comm);
-  findptssurfms_local_setup(&fd->local,elx,fd->fdms.nsid,fd->fdms.distfint,
-                           n,nel,m,bbox_tol,local_hash_size,
-                           npt_max, newt_tol,ims);
+  findptssurfms_local_setup( &fd->local,
+                            elx,
+                            fd->fdms.nsid,
+                            fd->fdms.distfint,
+                            n,
+                            nel,
+                            m,
+                            bbox_tol,
+                            local_hash_size,
+                            npt_max,
+                            newt_tol,
+                            ims );
   hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,global_hash_size,&fd->cr);
+
+  // printf("\n----------------------\nGlobal Hash data\n----------------------\n");
+  // printf("%llu %f %f - hashn and hashfac\n",fd->hash.hash_n,fd->hash.fac[0],fd->hash.fac[1]);
+  // printf("%f %f %f %f - hashbounds\n",fd->hash.bnd[0].min,fd->hash.bnd[0].max,fd->hash.bnd[1].min,fd->hash.bnd[1].max);
+  // for (int i=0; i<fd->hash.hash_n*fd->hash.hash_n; i++) {
+  //     printf("%u ",fd->hash.offset[i]);
+  // }
+  // printf(" - hashoffset\n\n");
+
   fd->fevsetup = 0;
-  printf("findptssurf_setup done\n");
+  // printf("findptssurf_setup done\n\n");
   return fd;
 }
 

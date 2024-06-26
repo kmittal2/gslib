@@ -403,13 +403,39 @@ void printit_coords( const double *x, const double *y, const double *z,
   printf("\n");
 }
 
-static struct dbl_range dblsurf_range_expand(struct dbl_range b, double tol)
+void dblsurf_range_expand_2(struct dbl_range *m, struct dbl_range b[2], double tol)
 {
-  double a = (b.min+b.max)/2, l = (b.max-b.min)*(1+tol)/2;
-  if((b.max-b.min)<1e-6) l = 1e-1/2;  // FIXME: Just some arbitrary tolerance for now
-  struct dbl_range m;
-  m.min = a-l, m.max = a+l;
-  return m;
+  // amount of expansion in each physical dimension beyond current obbox bounds
+  double l[2] = {(b[0].max-b[0].min)*0.5*tol,
+                 (b[1].max-b[1].min)*0.5*tol};
+  for (int i=0; i<2; i++) {
+    if (l[i]<1e-12) {  // FIXME: 1e-12 is arbitrary
+      l[i] = l[(i+1)%2];
+      break;
+    }
+  }
+  for (int i=0; i<2; i++) {
+    m[i].min = b[i].min - l[i];
+    m[i].max = b[i].max + l[i];
+  }
+}
+
+void dblsurf_range_expand_3(struct dbl_range *m, struct dbl_range b[3], double tol)
+{
+  // amount of expansion in each physical dimension beyond current obbox bounds
+  double l[3] = {(b[0].max-b[0].min)*0.5*tol,
+                 (b[1].max-b[1].min)*0.5*tol,
+                 (b[2].max-b[2].min)*0.5*tol};
+  for (int i=0; i<3; i++) {
+    if (l[i]<1e-12) {  // FIXME: 1e-12 is arbitrary
+      l[i] = 0.5*( l[(i+1)%3] + l[(i+2)%3] ); // At least two directions will have non-zero expansion lengths
+      break;
+    }
+  }
+  for (int i=0; i<3; i++) {
+    m[i].min = b[i].min - l[i];
+    m[i].max = b[i].max + l[i];
+  }
 }
 
 void obboxsurf_calc_2(        struct obbox_2 *out,
@@ -488,10 +514,8 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
       DO_EDGE(0,r,x,y,work);  // the first edge according to lexicographic order, i.e. "bottom" edge
       #undef DO_EDGE
       #undef DO_BOUND
-
-      out->x[0] = dblsurf_range_expand(ab[0],tol),
-      out->x[1] = dblsurf_range_expand(ab[1],tol);
-
+      
+      dblsurf_range_expand_2(out->x, ab, tol);
       // printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
       // printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
     }
@@ -567,10 +591,7 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       #undef DO_FACE
       #undef DO_BOUND
 
-      out->x[0] = dblsurf_range_expand(ab[0],tol),
-      out->x[1] = dblsurf_range_expand(ab[1],tol);
-      out->x[2] = dblsurf_range_expand(ab[2],tol);
-
+      dblsurf_range_expand_3(out->x, ab, tol);
       // printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
       // printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
       // printit_obbox_dbl_range(&out->x[2],"ab2-expanded");
