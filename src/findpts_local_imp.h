@@ -337,24 +337,26 @@ void findptsms_local_setup(struct findpts_local_data *const fd,
 }
 
 void findptssurfms_local_setup( struct findpts_local_data *const fd,
-                                       const double *const elx[D],
-                                       const unsigned *const nsid,
-                                      const double *const distfint,
-                                            const unsigned n[D-1],
-                                                   const uint nel,
-                                            const unsigned m[D-1],
-                                            const double bbox_tol,
-                                         const uint max_hash_size,
-                                           const unsigned npt_max,
-                                            const double newt_tol,
-                                                   const uint ims )
+                               const double *const elx[D],
+                               const unsigned *const nsid,
+                               const double *const distfint,
+                               const unsigned n[D-1],
+                               const uint nel,
+                               const unsigned m[D-1],
+                               const double bbox_tol,
+                               const uint max_hash_size,
+                               const unsigned npt_max,
+                               const double newt_tol,
+                               const uint ims )
 {
   unsigned d;
   unsigned ntot=n[0]; for(d=1;d<D-1;++d) ntot*=n[d];
   fd->ntot = ntot;
-  for(d=0;d<D;++d) fd->elx[d]=elx[d];
+  for(d=0;d<D;++d) {
+    fd->elx[d] = elx[d];
+  }
   fd->nsid = nsid;
-  fd->obb=tmalloc(struct obbox,nel);  // obbox struct stores bbox info for each element
+  fd->obb = tmalloc(struct obbox,nel);  // obbox struct stores bbox info for each element
   obboxsurf_calc(fd->obb,elx,n,nel,m,bbox_tol);
   hash_build(&fd->hd,fd->obb,nel,max_hash_size);
 

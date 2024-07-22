@@ -76,6 +76,16 @@ static struct dbl_range dbl_range_expand(struct dbl_range b, double tol)
   return m;
 }
 
+static void bbox_1_tfm(double *out, const double x0[2], const double Ji[4],
+                       const double *x, const double *y, unsigned n)
+{
+  unsigned i;
+  for(i=0;i<n;++i) {
+    const double dx = x[i]-x0[0], dy = y[i]-x0[1];
+    out[  i] = Ji[0]*dx + Ji[1]*dy;
+  }
+}
+
 static void bbox_2_tfm(double *out, const double x0[2], const double Ji[4],
                        const double *x, const double *y, unsigned n)
 {
@@ -201,14 +211,27 @@ void obbox_calc_2(struct obbox_2 *out,
 //      printit(Ji, 4, "Jacobian inverse");
 
 
-      /* double work[2*m##r] */
+      /* double work[2*m##r]
+         Find the bounds along a specific physical dimension, and merge with
+         existing bounds if specified.
+      */
       #define DO_BOUND(bnd,merge,r,x,work) do { \
         struct dbl_range b = \
         lob_bnd_1(lob_bnd_data_##r,n##r,m##r, x, work); \
         if(merge) bnd=dbl_range_merge(bnd,b); else bnd=b; \
       } while(0)
 
-      /* double work[2*n##r + 2*m##r] */
+      /* double work[2*n##r + 2*m##r]
+         Find the bounds for a edge, for all its physical dimensions, and merge 
+         with existing bounds if specified.
+         We will explain every line of the macro:
+         lines 1,2: Bound x and y physical dimensions separately and store in
+                    ab[0] and ab[1] respectively.
+         lines 3  : Transform the AABB in physical dimensions to the reference
+                    frame, and store in work.
+         lines 4,5: Bound the transformed AABB and store its ref space bounds in
+                    tb[0] and tb[1] respectively.
+      */
       #define DO_EDGE(merge,r,x,y,work) do { \
         DO_BOUND(ab[0],merge,r,x,work); \
         DO_BOUND(ab[1],merge,r,y,work); \
@@ -217,33 +240,45 @@ void obbox_calc_2(struct obbox_2 *out,
         DO_BOUND(tb[1],merge,r,(work)+n##r,(work)+2*n##r); \
       } while(0)
 
+      // Bound edge whose x and y coords start from memory pointed by "x" and "y".
+      // This is the bottom lexicographic edge of the element.
       DO_EDGE(0,r,x,y,work);
+      // printit_obbox_dbl_range(&ab[0],"ab0-E0");
+      // printit_obbox_dbl_range(&ab[1],"ab1");
 
-//      printit_obbox_dbl_range(&ab[0],"ab0-E0");
-//      printit_obbox_dbl_range(&ab[1],"ab1");
+      // Beyond this point, any bound calculation would be merged with the existing
+      // bounds. So, 1 is passed as the first argument to DO_EDGE.
 
+      // This is the top lexicographic edge of the element.
       DO_EDGE(1,r,&x[nrs-nr],&y[nrs-nr],work);
-//      printit_obbox_dbl_range(&ab[0],"ab0-E1");
-//      printit_obbox_dbl_range(&ab[1],"ab1");
+      // printit_obbox_dbl_range(&ab[0],"ab0-E1");
+      // printit_obbox_dbl_range(&ab[1],"ab1");
 
-      /* double work[4*ns + 2*ms] */
+      /* double work[4*ns + 2*ms]
+         Helper macro to call DO_EDGE for the left and right lexicographic edges
+         whose coords are not contiguous in memory.
+      */
       #define GET_EDGE(off) do { \
         copy_strided(work   , x+off,1,nr,ns); \
         copy_strided(work+ns, y+off,1,nr,ns); \
         DO_EDGE(1,s,work,work+ns,work+2*ns); \
       } while(0)
-  
+
+      // This is the left lexicographic edge of the element.
       GET_EDGE(0);
-//      printit_obbox_dbl_range(&ab[0],"ab0-E2");
-//      printit_obbox_dbl_range(&ab[1],"ab1");
+      // printit_obbox_dbl_range(&ab[0],"ab0-E2");
+      // printit_obbox_dbl_range(&ab[1],"ab1");
+
+      // This is the right lexicographic edge of the element.
       GET_EDGE(nr-1);
-//      printit_obbox_dbl_range(&ab[0],"ab0-E3");
-//      printit_obbox_dbl_range(&ab[1],"ab1");
+      // printit_obbox_dbl_range(&ab[0],"ab0-E3");
+      // printit_obbox_dbl_range(&ab[1],"ab1");
   
       #undef GET_EDGE
       #undef DO_EDGE
       #undef DO_BOUND
 
+      // set bbox bounds based on aabb bounds expanded based on tol
       out->x[0] = dbl_range_expand(ab[0],tol),
       out->x[1] = dbl_range_expand(ab[1],tol);
 //      printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
@@ -254,13 +289,18 @@ void obbox_calc_2(struct obbox_2 *out,
 //      printit_obbox_dbl_range(&tb[1],"tb1-final");
   
       {
+        // av0 and av1 are the ref space mid-points of the reference frame bounding box
         const double av0=(tb[0].min+tb[0].max)/2, av1=(tb[1].min+tb[1].max)/2;
+        // Calculate OBBOX center in physical space
         out->c0[0] = x0[0] + J[0]*av0 + J[1]*av1;
         out->c0[1] = x0[1] + J[2]*av0 + J[3]*av1;
       }
       {
+        // Expand ref space bounding box based on tol
         const double di0 = 2/((1+tol)*(tb[0].max-tb[0].min)),
                      di1 = 2/((1+tol)*(tb[1].max-tb[1].min));
+        // The same factor of expansion is applied to the Jacobian matrix
+        // to get the OBBOX transformation matrix.
         out->A[0]=di0*Ji[0], out->A[1]=di0*Ji[1];
         out->A[2]=di1*Ji[2], out->A[3]=di1*Ji[3];
       }
@@ -467,13 +507,18 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
            *const work = data + 2*nr + lbsize0;        // wsize doubles
 
     /*
+    All the calculation in SETUP_DIR is done for the reference space. So the
+    question arises: why r and s are treated separately?  This is because James
+    assumed that the r and s directions could have different number of nodes.
+    For us, that is not the case. So, we can just do this calculation in one
+    direction and use everywhere.
     1. lag would store a pointer to a function of type lagrange_fun, pointing to
        the correct function to evaluate the lagrange polynomials on nr GLL nodes
-    1. gll_lag_setup returns correct lag_coeff function and lag_coeffs in work
-    2. I0##r stores lag_coeffs for d=1, work already has lag_coeffs for d=0, n=n##r, d=1, xh=0
-    3. lob_bnd_setup assigns to lob_bnd_data_##r, which is used to compute bounds
-
-    It seems all operations here are independently done for r and s! so safe?
+    2. gll_lag_setup returns correct lag_coeff function and stores lag_coeffs
+       (based on ref coords) in work for evaluating the lagrange polynomials.
+    3. the coefficients in work are utilized to evaluate the lagrange polynomials and 
+       their 1st derivatives at x=0 (or r=0) in I0##r.
+    4. lob_bnd_setup assigns to lob_bnd_data_##r, which is used to compute bounds
     */
     #define SETUP_DIR(r) do { \
       lagrange_fun *const lag = gll_lag_setup(work, n##r); \
@@ -485,6 +530,9 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
     
     #undef SETUP_DIR
 
+    // At this stage, I0r contains the lag_coeffs for function and its 1st
+    // derivative, in its first nr and next nr elements respectively, AT r=0.
+
     // Loop over all elements, every iteration, x and y pointers are incremented
     // by total number of dofs
     uint nelorig = nel;
@@ -492,32 +540,71 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
       // printf("nelID: %u\n", nelorig-nel);
       // printit_coords(x, y, NULL, nr, 2, "2D");
 
-      struct dbl_range ab[2];
+      // J = [dx/dr, dy/dr], Ji = J^-1
+      double x0[2], J[2], Ji[2];
+      struct dbl_range ab[2], tb;
 
-      /* double work[2*m##r] */
+      // returns center of the element, and stores Jacobian in J
+      x0[0] = tensor_ig1(J  , I0r,nr, x);
+      x0[1] = tensor_ig1(J+1, I0r,nr, y);
+      Ji[0] = 1/J[0]; Ji[1] = 1/J[1];
+
+      /* double work[2*m##r]
+         Find the bounds along a specific physical dimension, and merge with
+         existing bounds merge!=0.
+      */
       #define DO_BOUND(bnd,merge,r,x,work) do { \
         struct dbl_range b = \
         lob_bnd_1(lob_bnd_data_##r,n##r,m##r, x, work); \
         if(merge) bnd=dbl_range_merge(bnd,b); else bnd=b; \
       } while(0)
 
-      /* double work[2*n##r + 2*m##r] */
-      /*
-      1. find bounds for x coords of an element, store in ab[0]
-      2. find bounds for y coords of an element, store in ab[1]
-      Merge is set to 0 for all Do_EDGE calls for us
+      /* double work[2*n##r + 2*m##r]
+         Find the bounds for a edge, for all its physical dimensions, and merge 
+         with existing bounds if specified.
+         We will explain every line of the macro:
+         lines 1,2: Bound x and y physical dimensions separately and store in
+                    ab[0] and ab[1] respectively.
+         lines 3  : Transform the AABB in physical dimensions to the reference
+                    frame, and store in work.
+         lines 4: Bound the transformed AABB and store its ref space bound in tb.
       */
+      // #define DO_EDGE(merge,r,x,y,work) do { \
+      //   DO_BOUND(ab[0],merge,r,x,work); \
+      //   DO_BOUND(ab[1],merge,r,y,work); \
+      //   bbox_1_tfm(work, x0,Ji, x,y,n##r); \
+      //   DO_BOUND(tb,merge,r,(work),(work)+2*n##r); \
+      // } while(0)
+
       #define DO_EDGE(merge,r,x,y,work) do { \
         DO_BOUND(ab[0],merge,r,x,work); \
         DO_BOUND(ab[1],merge,r,y,work); \
       } while(0)
+
       DO_EDGE(0,r,x,y,work);  // the first edge according to lexicographic order, i.e. "bottom" edge
+
       #undef DO_EDGE
       #undef DO_BOUND
       
       dblsurf_range_expand_2(out->x, ab, tol);
       // printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
       // printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
+
+      // {
+      //   // av0 and av1 are the ref space mid-points of the reference frame bounding box
+      //   const double av0=(tb.min+tb.max)/2;
+      //   // Calculate OBBOX center in physical space
+      //   out->c0[0] = x0[0] + J[0]*av0;
+      //   out->c0[1] = x0[1] + J[1]*av0;
+      // }
+      // {
+      //   // Expand ref space bounding box based on tol
+      //   const double di0 = 2/((1+tol)*(tb.max-tb.min));
+      //   // The same factor of expansion is applied to the Jacobian matrix
+      //   // to get the OBBOX transformation matrix.
+      //   out->A[0]=di0*Ji[0], out->A[1]=di0*Ji[1];
+      // }
+
     }
   }
   

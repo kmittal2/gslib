@@ -296,17 +296,17 @@ struct findpts_data *findptsms_setup(
 }
 
 struct findpts_data *findptssurfms_setup( const struct comm *const comm,
-                                           const double *const elx[D],
-                                                const unsigned n[D-1],
-                                                       const uint nel,
-                                                const unsigned m[D-1],
-                                                const double bbox_tol,
-                                           const uint local_hash_size,
-                                          const uint global_hash_size,
-                                               const unsigned npt_max,
-                                                const double newt_tol, 
-                                               const uint *const nsid,
-                                          const double *const distfint )
+                                        const double *const elx[D],
+                                        const unsigned n[D-1],
+                                        const uint nel,
+                                        const unsigned m[D-1],
+                                        const double bbox_tol,
+                                        const uint local_hash_size,
+                                        const uint global_hash_size,
+                                        const unsigned npt_max,
+                                        const double newt_tol, 
+                                        const uint *const nsid,
+                                        const double *const distfint )
 {
   uint ims=1;
   struct findpts_data *const fd = tmalloc(struct findpts_data, 1);
@@ -705,15 +705,15 @@ struct findpts_data *findpts_setup(
 }
 
 struct findpts_data *findptssurf_setup( const struct comm *const comm,
-                                         const double *const elx[D],
-                                              const unsigned n[D-1],
-                                                     const uint nel,
-                                              const unsigned m[D-1],
-                                              const double bbox_tol,
-                                         const uint local_hash_size,
-                                        const uint global_hash_size,
-                                             const unsigned npt_max,
-                                              const double newt_tol )
+                                      const double *const elx[D],
+                                      const unsigned n[D-1],
+                                      const uint nel,
+                                      const unsigned m[D-1],
+                                      const double bbox_tol,
+                                      const uint local_hash_size,
+                                      const uint global_hash_size,
+                                      const unsigned npt_max,
+                                      const double newt_tol )
 { 
   struct findpts_data *const fd = tmalloc(struct findpts_data, 1);
   uint ims         = 0;
