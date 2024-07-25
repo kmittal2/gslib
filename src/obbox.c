@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "c99.h"
+#include <math.h>    /* for sqrt */
 #include "name.h"
 #include "fail.h"
 #include "types.h"
@@ -485,8 +486,8 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
                               const unsigned m[1],
                                  const double tol )
 {
-  const double   *x = elx[0],
-                 *y = elx[1];
+  const double *x   = elx[0],
+               *y   = elx[1];
   const unsigned nr = n[0],
                  mr = m[0];
 
@@ -527,90 +528,87 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
     } while(0)
     
     SETUP_DIR(r);
-    
     #undef SETUP_DIR
 
-    // At this stage, I0r contains the lag_coeffs for function and its 1st
-    // derivative, in its first nr and next nr elements respectively, AT r=0.
-
-    // Loop over all elements, every iteration, x and y pointers are incremented
-    // by total number of dofs
+    // Loop over all elements; note the decrementing nel
     uint nelorig = nel;
-    for(;nel;--nel,x+=nr,y+=nr,++out) {
-      // printf("nelID: %u\n", nelorig-nel);
-      // printit_coords(x, y, NULL, nr, 2, "2D");
+    for( ; nel; --nel,x+=nr,y+=nr,++out) {
+      double x0[2], A[4];            //x0: element center; A: the transformation from phy. to ref. space
+      struct dbl_range ab[2], tb[2]; //ab: aabb bounds; tb: transformed aabb bounds
 
-      // J = [dx/dr, dy/dr], Ji = J^-1
-      double x0[2], J[2], Ji[2];
-      struct dbl_range ab[2], tb;
+      x0[0] = tensor_ig1(A  ,I0r,nr,x); // A[0] = dx/dr, x0[0] = x(r=0), i.e., element center
+      x0[1] = tensor_ig1(A+1,I0r,nr,y); // A[1] = dy/dr, x0[1] = y(r=0), i.e., element center
+      A[2] = sqrt( A[0]*A[0] + A[1]*A[1] );
+      A[0] = A[0]/A[2];
+      A[1] = A[1]/A[2];
+      A[2] = -A[1];
+      A[3] =  A[0];
 
-      // returns center of the element, and stores Jacobian in J
-      x0[0] = tensor_ig1(J  , I0r,nr, x);
-      x0[1] = tensor_ig1(J+1, I0r,nr, y);
-      Ji[0] = 1/J[0]; Ji[1] = 1/J[1];
+      // printit(x0, 2, "center x0");
+      // printit(A,  4, "Transformation matrix A");
+      /* At this stage, A has the rotation matrix that captures the rotation the
+       * physical nodes require to align the tangent at element center with the
+       * x-axis.
+       */
 
       /* double work[2*m##r]
-         Find the bounds along a specific physical dimension, and merge with
-         existing bounds merge!=0.
-      */
-      #define DO_BOUND(bnd,merge,r,x,work) do { \
-        struct dbl_range b = \
-        lob_bnd_1(lob_bnd_data_##r,n##r,m##r, x, work); \
-        if(merge) bnd=dbl_range_merge(bnd,b); else bnd=b; \
+       * Find the bounds along a specific physical dimension.
+       */
+      #define DO_BOUND(bnd,r,x,work) do { \
+        bnd = lob_bnd_1(lob_bnd_data_##r,n##r,m##r, x, work); \
       } while(0)
 
       /* double work[2*n##r + 2*m##r]
-         Find the bounds for a edge, for all its physical dimensions, and merge 
-         with existing bounds if specified.
-         We will explain every line of the macro:
-         lines 1,2: Bound x and y physical dimensions separately and store in
-                    ab[0] and ab[1] respectively.
-         lines 3  : Transform the AABB in physical dimensions to the reference
-                    frame, and store in work.
-         lines 4: Bound the transformed AABB and store its ref space bound in tb.
-      */
-      // #define DO_EDGE(merge,r,x,y,work) do { \
-      //   DO_BOUND(ab[0],merge,r,x,work); \
-      //   DO_BOUND(ab[1],merge,r,y,work); \
-      //   bbox_1_tfm(work, x0,Ji, x,y,n##r); \
-      //   DO_BOUND(tb,merge,r,(work),(work)+2*n##r); \
-      // } while(0)
-
-      #define DO_EDGE(merge,r,x,y,work) do { \
-        DO_BOUND(ab[0],merge,r,x,work); \
-        DO_BOUND(ab[1],merge,r,y,work); \
+       * Find the bounds for a edge, for all its physical dimensions.
+       * We will explain every line of the macro:
+       * lines 1,2: Bound x and y physical dimensions separately and store in
+       *            ab[0] and ab[1] respectively.
+       * lines 3  : Transform the gll nodes according to A and store in work.
+       * lines 4,5: Bound the transformed gll nodes and store the bounds of 
+       *            the transformation in tb[0] and tb[1].
+       */
+      #define DO_EDGE(r,x,y,work) do { \
+        DO_BOUND(ab[0],r,x,work); \
+        DO_BOUND(ab[1],r,y,work); \
+        bbox_2_tfm(work, x0,A, x,y,n##r); \
+        DO_BOUND(tb[0],r,(work),(work)+2*n##r); \
+        DO_BOUND(tb[1],r,(work)+n##r,(work)+2*n##r); \
       } while(0)
-
-      DO_EDGE(0,r,x,y,work);  // the first edge according to lexicographic order, i.e. "bottom" edge
-
+      // the first edge for nodes in lexicographic order
+      DO_EDGE(r,x,y,work);
       #undef DO_EDGE
       #undef DO_BOUND
-      
+
       dblsurf_range_expand_2(out->x, ab, tol);
-      // printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
-      // printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
 
-      // {
-      //   // av0 and av1 are the ref space mid-points of the reference frame bounding box
-      //   const double av0=(tb.min+tb.max)/2;
-      //   // Calculate OBBOX center in physical space
-      //   out->c0[0] = x0[0] + J[0]*av0;
-      //   out->c0[1] = x0[1] + J[1]*av0;
-      // }
-      // {
-      //   // Expand ref space bounding box based on tol
-      //   const double di0 = 2/((1+tol)*(tb.max-tb.min));
-      //   // The same factor of expansion is applied to the Jacobian matrix
-      //   // to get the OBBOX transformation matrix.
-      //   out->A[0]=di0*Ji[0], out->A[1]=di0*Ji[1];
-      // }
+      // av0 and av1 are the rotated AABB center coordinates and are hence
+      // the offset of the OBB center with respect to the element center
+      // in the rotated space.
+      const double av0 = (tb[0].min+tb[0].max)/2,
+                   av1 = (tb[1].min+tb[1].max)/2;
+      // We now "un"rotate av0 and av1 to get the OBB center in the original
+      // physical space.
+      const double dx0 =  A[0]*av0 - A[1]*av1,
+                   dx1 = -A[2]*av0 + A[3]*av1;
+      // Calculate the true untranslated OBBOX center in physical space
+      out->c0[0] = x0[0] + dx0;
+      out->c0[1] = x0[1] + dx1;
 
+      dblsurf_range_expand_2(tb, tb, tol);
+      // printit_obbox_dbl_range(&tb[0],"tb0-expanded");
+      // printit_obbox_dbl_range(&tb[1],"tb1-expanded");
+      const double di0 = 2/(tb[0].max-tb[0].min),
+                   di1 = 2/(tb[1].max-tb[1].min);
+      // The scaling matrix is premultiplied to the rotation matrix
+      out->A[0]=di0*A[0], out->A[1]=di0*A[1];
+      out->A[2]=di1*A[2], out->A[3]=di1*A[3];
+
+      // printit(out->c0, 2, "center out->c0");
     }
   }
-  
-  free(data);  
+  free(data);
 }
-       
+
 void obboxsurf_calc_3(        struct obbox_3 *out,
                        const double *const elx[3],
                               const unsigned n[2],
@@ -648,7 +646,8 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       lag(I0##r, work,n##r,1, 0); \
       lob_bnd_setup(lob_bnd_data_##r, n##r,m##r); \
     } while(0)
-    SETUP_DIR(r); SETUP_DIR(s);
+    SETUP_DIR(r);
+    SETUP_DIR(s);
     #undef SETUP_DIR
     
     uint nelorig = nel;
@@ -657,23 +656,34 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       // printit_coords(x, y, z, nrs, 3, "3D");
 
       struct dbl_range ab[3];
+      double x0[3], A[9];
+      struct dbl_range tb[3];
  
+      /* double work[2*nr] */
+      // x0[0] = tensor_ig2(A  , I0r,nr, I0s,ns, x, work);
+      // x0[1] = tensor_ig2(A+3, I0r,nr, I0s,ns, y, work);
+      // x0[2] = tensor_ig2(A+6, I0r,nr, I0s,ns, z, work);
+
       /* double work[2*m##r*(n##s+m##s+1)] */
-      #define DO_BOUND(bnd,merge,r,s,x,work) do { \
-        struct dbl_range b = \
-        lob_bnd_2(lob_bnd_data_##r,n##r,m##r, \
-                  lob_bnd_data_##s,n##s,m##s, x, work); \
-        if(merge) bnd=dbl_range_merge(bnd,b); else bnd=b; \
+      #define DO_BOUND(bnd,r,s,x,work) do { \
+        bnd = lob_bnd_2(lob_bnd_data_##r,n##r,m##r, \
+                        lob_bnd_data_##s,n##s,m##s, \
+                        x, work); \
       } while(0)
 
       /* double work[3*n##r*n##s+2*m##r*(n##s+m##s+1)] */
-      #define DO_FACE(merge,r,s,x,y,z,work) do { \
-        DO_BOUND(ab[0],merge,r,s,x,work); \
-        DO_BOUND(ab[1],merge,r,s,y,work); \
-        DO_BOUND(ab[2],merge,r,s,z,work); \
+      #define DO_FACE(r,s,x,y,z,work) do { \
+        DO_BOUND(ab[0],r,s,x,work); \
+        DO_BOUND(ab[1],r,s,y,work); \
+        DO_BOUND(ab[2],r,s,z,work); \
       } while(0)
 
-      DO_FACE(0,r,s,x,y,z,work);
+      // bbox_3_tfm(work, x0,A, x,y,z,n##r*n##s); \
+      // DO_BOUND(tb[0],r,s,(work)            ,(work)+3*n##r*n##s); \
+      // DO_BOUND(tb[1],r,s,(work)+  n##r*n##s,(work)+3*n##r*n##s); \
+      // DO_BOUND(tb[2],r,s,(work)+2*n##r*n##s,(work)+3*n##r*n##s);
+
+      DO_FACE(r,s,x,y,z,work);
 
       #undef DO_FACE
       #undef DO_BOUND

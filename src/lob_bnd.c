@@ -177,8 +177,9 @@ void lob_bnd_setup(double *restrict data, unsigned n, unsigned m)
     memcpy(pl,pr,2*n*sizeof(double)); // for next iteration
   }
 
-  /* lbnp : lb split into negative and positive parts
-   * why?
+  /* lbnp : lb split into negative and positive parts, hence size 2*(2*n*m)
+   * Useful since the signs of the lower and upper bounds are important when
+   * deciding the upper and lower bounding functions.
    */
   for(i=0;i<nm;++i) {
     double f;
@@ -204,31 +205,36 @@ static void lob_bnd_fst( double *restrict b,
   unsigned i,j;
   double a0=0, a1=0;
 
-  // calculate a0 and a1 as required for the linear functionals
+  // Calculate a0 and a1, check Q's evaluation in lob_bnd_setup()
   for(i=0;i<n;++i)
     a0 += Q[2*i]*u[i], a1 += Q[2*i+1]*u[i];
 
-  // Chebyshev nodal values of the lower and upper piecewise linear bounding
-  // functions are initialized to this
+  // For jth Chebyshev node, initialize the bounds to a0+a1*h[j] 
   for(j=0;j<m;++j)
     b[2*j+1] = b[2*j+0] = a0 + a1*h[j];
 
   // b stores the bounds
-  for(i=0;i<n;++i) { // for each Lagrange polynomial
-    double w = u[i] - (a0 + a1*z[i]); // u(x) when evaluated at a gll node gives w
-    if(w>=0) {
-      // sum the contribution of each Lagrange polynomial at each Chebyshev node
+  // for each Lagrange polynomial, we increment the bounds at the Chebyshev
+  // nodes.
+  for(i=0;i<n;++i) {
+    double w = u[i] - (a0 + a1*z[i]); // w for ith lagrange polynomial
+    // if w is negative, and given (lb[0]-lb[1])<0, w*(lb[0]-lb[1])>0.
+    // i.e., w*lb[0]>w*lb[1].
+    // The inner loops are used to increment the bounds at the Chebyshev nodes
+    // for each Lagrange polynomial.
+    if(w>=0)
       for(j=0;j<m;++j)
         b[2*j+0]+=w*lb[0], b[2*j+1]+=w*lb[1], lb+=2;
-    }
-    else {
-      // sum the contribution of each Lagrange polynomial at each Chebyshev node
+    else
       for(j=0;j<m;++j)
         b[2*j+0]+=w*lb[1], b[2*j+1]+=w*lb[0], lb+=2;
-    }
   }
 }
 
+/* See section 2.4 in the document for th process of bounding 
+ * 1D functions with bounded (instead of known) coefficients (i.e.,
+ * bounded nodal values for Lagrange polynomials).
+ */
 static void lob_bnd_ext( double *restrict b_,
                          const double *restrict z,
                          const double *restrict Q,
@@ -241,17 +247,27 @@ static void lob_bnd_ext( double *restrict b_,
                          double *restrict a)
 {
   unsigned i,j,k;
-  for(i=0;i<mr;++i) a[2*i+1]=a[2*i+0]=0;
+  for(i=0;i<mr;++i)
+    a[2*i+1] = a[2*i+0] = 0; // initialize a
+
   {
     const double *restrict br = br_;
     for(j=0;j<n;++j) {
+      // see Q's evaluation in lob_bnd_setup()
       double t, q0 = Q[2*j], q1 = Q[2*j+1];
-      for(i=0;i<mr;++i)
-        t=(br[0]+br[1])/2, br+=2, a[2*i]+=q0*t, a[2*i+1]+=q1*t;
+      // For each Chebyshev node, calculate a0 and a1, whose values 
+      // will depend linearly on the bounds of the solution function
+      // corresponding to jth Lagrange polynomial and ith Chebyshev node.
+      for(i=0;i<mr;++i) {
+        t=(br[0]+br[1])/2, a[2*i]+=q0*t, a[2*i+1]+=q1*t;
+        br+=2;
+      }
     }
   } 
 
   {
+    // b stores the bounds of the solution function at m Chebyshev nodes
+    // for each mr Chebyshev nodes in the r direction.
     double *restrict b = b_;
     for(i=0;i<mr;++i) {
       double a0=a[2*i],a1=a[2*i+1];
@@ -313,10 +329,21 @@ void lob_bnd_lin_2( double *restrict b,
   const double *zr=lob_bnd_data_r, *Qr=zr+nr, *hr=Qr+2*nr, *lb_r=hr+mr;
   const double *zs=lob_bnd_data_s, *Qs=zs+ns, *hs=Qs+2*ns, *lbnp_s=hs+ms+2*ns*ms;
   double *a = work, *br = a+2*mr;
-  for(;un;--un, b+=2*mrs) {
+  for(; un; --un,b+=2*mrs) {
     double *br_; unsigned i;
+    // If we fix the Lagrange Polynomial in s dir., what are the bounds
+    // of the solution function for each Lagrange polynomial in r dir.?
+    // br_ is a pointer to the corresponding bounds, and has naturally a 
+    // size of 2*mr, to store the results of the 1D bounding problem
+    // corresponding to ith Lagrange polynomial in s dir.
     for(i=0,br_=br; i<ns; ++i,br_+=2*mr,u+=nr)
       lob_bnd_fst(br_, zr,Qr,hr,lb_r,nr,mr, u);
+
+    // Once the bounds for each Lagrange polynomial in s dir. are known,
+    // we can calculate the bounds for the solution function in the complete
+    // rs-space.
+    // This calculation is similar to lob_bnd_fst, but w_i is unknown, but
+    // its bounds are known.
     lob_bnd_ext(b, zs,Qs,hs,lbnp_s,ns,ms, br,mr, a);
   }
 }
@@ -348,7 +375,9 @@ static struct dbl_range minmax(const double *restrict b, unsigned m)
 {
   struct dbl_range bnd;
   bnd.min = b[0], bnd.max = b[1];
-  for(--m,b+=2;m;--m,b+=2)
+  // --m is used to start at m-1 and go down to 0
+  // b+=2 is used to move to the next chebyshev bound data
+  for(--m,b+=2; m; --m,b+=2)
     bnd.min = b[0]<bnd.min?b[0]:bnd.min,
     bnd.max = b[1]>bnd.max?b[1]:bnd.max;
   return bnd;
