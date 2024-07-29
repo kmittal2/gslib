@@ -656,13 +656,90 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       // printit_coords(x, y, z, nrs, 3, "3D");
 
       struct dbl_range ab[3];
-      double x0[3], A[9];
       struct dbl_range tb[3];
+      double x0[3], tv[9], A[9];
  
-      /* double work[2*nr] */
-      // x0[0] = tensor_ig2(A  , I0r,nr, I0s,ns, x, work);
-      // x0[1] = tensor_ig2(A+3, I0r,nr, I0s,ns, y, work);
-      // x0[2] = tensor_ig2(A+6, I0r,nr, I0s,ns, z, work);
+      /* double work[2*nr]
+       * Find the center of the element (r=0 ref. coord.) in physical space
+       */
+      x0[0] = tensor_ig2(tv+3, I0r,nr, I0s,ns, x, work);
+      x0[1] = tensor_ig2(tv+5, I0r,nr, I0s,ns, y, work);
+      x0[2] = tensor_ig2(tv+7, I0r,nr, I0s,ns, z, work);
+
+      // tangent vector 1
+      tv[0] = tv[3], tv[1] = tv[5], tv[2] = tv[7];
+      // tangent vector 2
+      tv[3] = tv[4], tv[4] = tv[6], tv[5] = tv[8];
+      // normal vector to the plane formed by t1 and t2 (cross product)
+      tv[6] = tv[1]*tv[5] - tv[2]*tv[4];
+      tv[7] = tv[2]*tv[3] - tv[0]*tv[5];
+      tv[8] = tv[0]*tv[4] - tv[1]*tv[3];
+      // normalize the normal vector
+      const double nmag  = sqrt( tv[6]*tv[6] + tv[7]*tv[7] + tv[8]*tv[8] );
+      tv[6] = tv[6]/nmag;
+      tv[7] = tv[7]/nmag;
+      tv[8] = tv[8]/nmag;
+      // At this point, we have tv = [tangent_r tangent_s normal]^T, all
+      // three are unit vectors
+
+      // printf("x0: %g %g %g\n", x0[0], x0[1], x0[2]);
+      // printf("tv1: %g %g %g\n", tv[0], tv[1], tv[2]);
+      // printf("tv2: %g %g %g\n", tv[3], tv[4], tv[5]);
+      // printf("normal: %g %g %g\n", tv[6], tv[7], tv[8]);
+
+      // Calculate the anticlockwise rotation theta_x about x-axis needed to
+      // bring the normal vector on the xz plane, i.e., theta_x.
+      // Also calculate the anticlockwise rotation about y-axis needed to 
+      // align the normal vector to the z-axis, i.e., theta_y.
+      if (fabs(tv[7])>1e-12) { // if normal vector is not parallel to xz plane
+        const double magyz   = sqrt( tv[7]*tv[7] + tv[8]*tv[8] ); // n's projection on the yz plane
+        const double cthetax = tv[8]/magyz, // cos(theta_x)
+                     sthetax = tv[7]/magyz, // sin(theta_x)
+                     cthetay = magyz,       // cos(theta_y): theta_y, the angle between n_xz and z axis
+                     sthetay = -tv[6];      // cos(theta_y): theta_y, the angle between n_xz and z axis
+        A[0] =  cthetay, A[1] = sthetax*sthetay, A[2] = cthetax*sthetay;
+        A[3] =  0,       A[4] = cthetax,         A[5] = -sthetax;
+        A[6] = -sthetay, A[7] = sthetax*cthetay, A[8] = cthetax*cthetay;
+      }
+      else {
+        const double cthetay = tv[8],   // cos(theta_y): theta_y, the angle between n_xz and z axis
+                     sthetay = -tv[6];  // cos(theta_y): theta_y, the angle between n_xz and z axis
+        // The rotation matrix that rotates the normal vector to the z-axis
+        A[0] =  cthetay, A[1] = 0, A[2] = sthetay;
+        A[3] =  0,       A[4] = 1, A[5] = 0;
+        A[6] = -sthetay, A[7] = 0, A[8] = cthetay;
+      }
+
+      /* The normal vector is now aligned with the z-axis. We choose to align
+       * the tangent with the larger magnitude to be the x-axis.
+       * The rotation matrix A is premultipled with the rotation required to 
+       * align the rotated tangent with the x-axis.
+       */
+      {
+        double cthetaz, sthetaz;
+        const double t1mag = sqrt( tv[0]*tv[0] + tv[1]*tv[1] + tv[2]*tv[2] );
+        const double t2mag = sqrt( tv[3]*tv[3] + tv[4]*tv[4] + tv[5]*tv[5] );
+        if (t1mag>t2mag) {
+          cthetaz = ( A[0]*tv[0] + A[1]*tv[1] + A[2]*tv[2] )/t1mag,
+          sthetaz = -( A[3]*tv[0] + A[4]*tv[1] + A[5]*tv[2] )/t1mag;
+          // printf("trotz: %f\n", ( A[6]*tv[0] + A[7]*tv[1] + A[8]*tv[2] )/t1mag );
+        }
+        else {
+          cthetaz = ( A[0]*tv[3] + A[1]*tv[4] + A[2]*tv[5] )/t2mag,
+          sthetaz = -( A[3]*tv[3] + A[4]*tv[4] + A[5]*tv[5] )/t2mag;
+          // printf("trotz: %f\n", ( A[6]*tv[3] + A[7]*tv[4] + A[8]*tv[5] )/t1mag );
+        }
+        double temp;
+        temp = cthetaz*A[0] - sthetaz*A[3];
+        A[3] = sthetaz*A[0] + cthetaz*A[3];
+        A[0] = temp;
+        temp = cthetaz*A[1] - sthetaz*A[4];
+        A[4] = sthetaz*A[1] + cthetaz*A[4];
+        A[1] = temp;
+        temp = cthetaz*A[2] - sthetaz*A[5];
+        A[5] = sthetaz*A[2] + cthetaz*A[5];
+        A[2] = temp;
+      }
 
       /* double work[2*m##r*(n##s+m##s+1)] */
       #define DO_BOUND(bnd,r,s,x,work) do { \
@@ -676,22 +753,37 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
         DO_BOUND(ab[0],r,s,x,work); \
         DO_BOUND(ab[1],r,s,y,work); \
         DO_BOUND(ab[2],r,s,z,work); \
+        bbox_3_tfm(work, x0,A, x,y,z,n##r*n##s); \
+        DO_BOUND(tb[0],r,s,(work)            ,(work)+3*n##r*n##s); \
+        DO_BOUND(tb[1],r,s,(work)+  n##r*n##s,(work)+3*n##r*n##s); \
+        DO_BOUND(tb[2],r,s,(work)+2*n##r*n##s,(work)+3*n##r*n##s); \
       } while(0)
-
-      // bbox_3_tfm(work, x0,A, x,y,z,n##r*n##s); \
-      // DO_BOUND(tb[0],r,s,(work)            ,(work)+3*n##r*n##s); \
-      // DO_BOUND(tb[1],r,s,(work)+  n##r*n##s,(work)+3*n##r*n##s); \
-      // DO_BOUND(tb[2],r,s,(work)+2*n##r*n##s,(work)+3*n##r*n##s);
-
       DO_FACE(r,s,x,y,z,work);
-
       #undef DO_FACE
       #undef DO_BOUND
 
       dblsurf_range_expand_3(out->x, ab, tol);
-      // printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
-      // printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
-      // printit_obbox_dbl_range(&out->x[2],"ab2-expanded");
+      dblsurf_range_expand_3(tb, tb, tol);
+      // printit_obbox_dbl_range(&tb[0],"tb0-expanded");
+      // printit_obbox_dbl_range(&tb[1],"tb1-expanded");
+      // printit_obbox_dbl_range(&tb[2],"tb2-expanded");
+
+      {
+        const double av0 = (tb[0].min+tb[0].max)/2,
+                     av1 = (tb[1].min+tb[1].max)/2,
+                     av2 = (tb[2].min+tb[2].max)/2;
+        out->c0[0] = x0[0] + A[0]*av0 + A[3]*av1 + A[6]*av2;
+        out->c0[1] = x0[1] + A[1]*av0 + A[4]*av1 + A[7]*av2;
+        out->c0[2] = x0[2] + A[2]*av0 + A[5]*av1 + A[8]*av2;
+      }
+      {
+        const double di0 = 2/(tb[0].max-tb[0].min),
+                     di1 = 2/(tb[1].max-tb[1].min),
+                     di2 = 2/(tb[2].max-tb[2].min);
+        out->A[0]=di0*A[0], out->A[1]=di0*A[1], out->A[2]=di0*A[2];
+        out->A[3]=di1*A[3], out->A[4]=di1*A[4], out->A[5]=di1*A[5];
+        out->A[6]=di2*A[6], out->A[7]=di2*A[7], out->A[8]=di2*A[8];
+      }
     }
   }
   
