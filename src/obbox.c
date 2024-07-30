@@ -679,8 +679,8 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       tv[6] = tv[6]/nmag;
       tv[7] = tv[7]/nmag;
       tv[8] = tv[8]/nmag;
-      // At this point, we have tv = [tangent_r tangent_s normal]^T, all
-      // three are unit vectors
+      // At this point, we have tv = [tangent_r tangent_s normal]^T, only 
+      // the normal vector is normalized.
 
       // printf("x0: %g %g %g\n", x0[0], x0[1], x0[2]);
       // printf("tv1: %g %g %g\n", tv[0], tv[1], tv[2]);
@@ -688,58 +688,38 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       // printf("normal: %g %g %g\n", tv[6], tv[7], tv[8]);
 
       // Calculate the anticlockwise rotation theta_x about x-axis needed to
-      // bring the normal vector on the xz plane, i.e., theta_x.
+      // bring the normal vector into the xz plane, say theta_x.
       // Also calculate the anticlockwise rotation about y-axis needed to 
-      // align the normal vector to the z-axis, i.e., theta_y.
+      // align the normal vector to the z-axis, say theta_y.
       if (fabs(tv[7])>1e-12) { // if normal vector is not parallel to xz plane
         const double magyz   = sqrt( tv[7]*tv[7] + tv[8]*tv[8] ); // n's projection on the yz plane
         const double cthetax = tv[8]/magyz, // cos(theta_x)
                      sthetax = tv[7]/magyz, // sin(theta_x)
-                     cthetay = magyz,       // cos(theta_y): theta_y, the angle between n_xz and z axis
-                     sthetay = -tv[6];      // cos(theta_y): theta_y, the angle between n_xz and z axis
+                     cthetay = magyz,       // cos(theta_y)
+                     sthetay = -tv[6];      // sin(theta_y)
         A[0] =  cthetay, A[1] = sthetax*sthetay, A[2] = cthetax*sthetay;
         A[3] =  0,       A[4] = cthetax,         A[5] = -sthetax;
         A[6] = -sthetay, A[7] = sthetax*cthetay, A[8] = cthetax*cthetay;
       }
+      // if normal vector is already parallel to xz plane, no rotation about
+      // x-axis is needed.
       else {
-        const double cthetay = tv[8],   // cos(theta_y): theta_y, the angle between n_xz and z axis
-                     sthetay = -tv[6];  // cos(theta_y): theta_y, the angle between n_xz and z axis
+        const double cthetay = tv[8],   // cos(theta_y)
+                     sthetay = -tv[6];  // sin(theta_y)
         // The rotation matrix that rotates the normal vector to the z-axis
         A[0] =  cthetay, A[1] = 0, A[2] = sthetay;
         A[3] =  0,       A[4] = 1, A[5] = 0;
         A[6] = -sthetay, A[7] = 0, A[8] = cthetay;
       }
 
-      /* The normal vector is now aligned with the z-axis. We choose to align
-       * the tangent with the larger magnitude to be the x-axis.
-       * The rotation matrix A is premultipled with the rotation required to 
-       * align the rotated tangent with the x-axis.
+      /* At this stage, the normal vector has been aligned with the z-axis. We
+       * still need to align the element in xy-plane.
+       * For that, we use the inverse of the Jacobian at the rotated element 
+       * center to transform the projection of the rotated element on xy-plane
+       * to the reference space [-1,1]x[-1,1].
+       * This transformation is premultiplied to A to get the final transformation
+       * matrix.
        */
-      {
-        double cthetaz, sthetaz;
-        const double t1mag = sqrt( tv[0]*tv[0] + tv[1]*tv[1] + tv[2]*tv[2] );
-        const double t2mag = sqrt( tv[3]*tv[3] + tv[4]*tv[4] + tv[5]*tv[5] );
-        if (t1mag>t2mag) {
-          cthetaz = ( A[0]*tv[0] + A[1]*tv[1] + A[2]*tv[2] )/t1mag,
-          sthetaz = -( A[3]*tv[0] + A[4]*tv[1] + A[5]*tv[2] )/t1mag;
-          // printf("trotz: %f\n", ( A[6]*tv[0] + A[7]*tv[1] + A[8]*tv[2] )/t1mag );
-        }
-        else {
-          cthetaz = ( A[0]*tv[3] + A[1]*tv[4] + A[2]*tv[5] )/t2mag,
-          sthetaz = -( A[3]*tv[3] + A[4]*tv[4] + A[5]*tv[5] )/t2mag;
-          // printf("trotz: %f\n", ( A[6]*tv[3] + A[7]*tv[4] + A[8]*tv[5] )/t1mag );
-        }
-        double temp;
-        temp = cthetaz*A[0] - sthetaz*A[3];
-        A[3] = sthetaz*A[0] + cthetaz*A[3];
-        A[0] = temp;
-        temp = cthetaz*A[1] - sthetaz*A[4];
-        A[4] = sthetaz*A[1] + cthetaz*A[4];
-        A[1] = temp;
-        temp = cthetaz*A[2] - sthetaz*A[5];
-        A[5] = sthetaz*A[2] + cthetaz*A[5];
-        A[2] = temp;
-      }
 
       /* double work[2*m##r*(n##s+m##s+1)] */
       #define DO_BOUND(bnd,r,s,x,work) do { \
@@ -748,41 +728,104 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
                         x, work); \
       } while(0)
 
-      /* double work[3*n##r*n##s+2*m##r*(n##s+m##s+1)] */
-      #define DO_FACE(r,s,x,y,z,work) do { \
-        DO_BOUND(ab[0],r,s,x,work); \
-        DO_BOUND(ab[1],r,s,y,work); \
-        DO_BOUND(ab[2],r,s,z,work); \
-        bbox_3_tfm(work, x0,A, x,y,z,n##r*n##s); \
-        DO_BOUND(tb[0],r,s,(work)            ,(work)+3*n##r*n##s); \
-        DO_BOUND(tb[1],r,s,(work)+  n##r*n##s,(work)+3*n##r*n##s); \
-        DO_BOUND(tb[2],r,s,(work)+2*n##r*n##s,(work)+3*n##r*n##s); \
-      } while(0)
-      DO_FACE(r,s,x,y,z,work);
-      #undef DO_FACE
+      // Obtain the axis aligned bounds
+      DO_BOUND(ab[0],r,s,x,work);
+      DO_BOUND(ab[1],r,s,y,work);
+      DO_BOUND(ab[2],r,s,z,work);
+      // Expand the AA-bounds based on the tol
+      dblsurf_range_expand_3(out->x, ab, tol);
+
+      double xtfm[3*nrs]; // xtfm[0]:x, xtfm[nrs]:y, xtfm[2*nrs]:z
+      // Obtain the GLL nodes, when rotated by A and translated to (0,0).
+      bbox_3_tfm(xtfm, x0,A, x,y,z,nrs);
+      // The rotated z-coords are used to calculate z-bounds.
+      DO_BOUND(tb[2],r,s,xtfm+2*nrs,work);
+
+      // Also apply A to the tangent vectors, which allows us to calculate 
+      // the Jacobian matrix at the rotated element center.
+      // NOTE that the z components of the rotated tangent vectors will become
+      // zero, since the normal vector is aligned with the z-axis.
+      double J[4], Ji[4];
+      J[0] = A[0]*tv[0] + A[1]*tv[1] + A[2]*tv[2]; // rotated dx/dr
+      J[1] = A[0]*tv[3] + A[1]*tv[4] + A[2]*tv[5]; // rotated dx/ds
+      J[2] = A[3]*tv[0] + A[4]*tv[1] + A[5]*tv[2]; // rotated dy/dr
+      J[3] = A[3]*tv[3] + A[4]*tv[4] + A[5]*tv[5]; // rotated dy/ds
+      mat_inv_2(Ji, J);
+
+      // Now transform the already rotated x,y coordinates according to Ji
+      // to their reference space.
+      for(unsigned i=0;i<nrs;++i) {
+        const double xt = xtfm[i], yt = xtfm[nrs+i];
+        xtfm[    i] = Ji[0]*xt + Ji[1]*yt;
+        xtfm[nrs+i] = Ji[2]*xt + Ji[3]*yt;
+      }
+      // Bound these reference space xy coordinates
+      DO_BOUND(tb[0],r,s,xtfm    ,work);
+      DO_BOUND(tb[1],r,s,xtfm+nrs,work);
+
       #undef DO_BOUND
 
-      dblsurf_range_expand_3(out->x, ab, tol);
-      dblsurf_range_expand_3(tb, tb, tol);
-      // printit_obbox_dbl_range(&tb[0],"tb0-expanded");
-      // printit_obbox_dbl_range(&tb[1],"tb1-expanded");
-      // printit_obbox_dbl_range(&tb[2],"tb2-expanded");
+      // printit_obbox_dbl_range(&tb[0],"tb0");
+      // printit_obbox_dbl_range(&tb[1],"tb1");
+      // printit_obbox_dbl_range(&tb[2],"tb2");
 
+      /* Calculate the center of the OBBOX obtained from Ji.A.x element, and 
+       * store it in {av0,av1,av2}.
+       * Then calculate Ainv.J.{av0,av1,av2} to obtain the position vector of 
+       * OBBOX center relative to element center.
+       * This position vector is then added to the element center to obtain the
+       * OBBOX center in physical space.
+       */
       {
         const double av0 = (tb[0].min+tb[0].max)/2,
                      av1 = (tb[1].min+tb[1].max)/2,
                      av2 = (tb[2].min+tb[2].max)/2;
-        out->c0[0] = x0[0] + A[0]*av0 + A[3]*av1 + A[6]*av2;
-        out->c0[1] = x0[1] + A[1]*av0 + A[4]*av1 + A[7]*av2;
-        out->c0[2] = x0[2] + A[2]*av0 + A[5]*av1 + A[8]*av2;
+        const double Jav0 = J[0]*av0 + J[1]*av1,
+                     Jav1 = J[2]*av0 + J[3]*av1;
+        out->c0[0] = x0[0] + A[0]*Jav0 + A[3]*Jav1 + A[6]*av2,
+        out->c0[1] = x0[1] + A[1]*Jav0 + A[4]*Jav1 + A[7]*av2,
+        out->c0[2] = x0[2] + A[2]*Jav0 + A[5]*Jav1 + A[8]*av2;
       }
+
+      // Finally, we premultiply the scaling matrix to Ji.A to obtain the final
+      // transformation matrix.
       {
+        double tb2orig = tb[2].max-tb[2].min;
+        // if the z-bounds are non-zero, we rescale z-bounds to size 2.
+        // This is to make sure that the expansion length added in all 3 
+        // directions are consistently scaled.
+        if (tb2orig>1e-12) {
+          const double temp = 2/tb2orig;
+          tb[2].min *= temp;
+          tb[2].max *= temp;
+        }
+        dblsurf_range_expand_3(tb,tb,tol);
+        // printit_obbox_dbl_range(&tb[0],"tb0-expanded");
+        // printit_obbox_dbl_range(&tb[1],"tb1-expanded");
+        // printit_obbox_dbl_range(&tb[2],"tb2-expanded");
+
         const double di0 = 2/(tb[0].max-tb[0].min),
-                     di1 = 2/(tb[1].max-tb[1].min),
-                     di2 = 2/(tb[2].max-tb[2].min);
-        out->A[0]=di0*A[0], out->A[1]=di0*A[1], out->A[2]=di0*A[2];
-        out->A[3]=di1*A[3], out->A[4]=di1*A[4], out->A[5]=di1*A[5];
-        out->A[6]=di2*A[6], out->A[7]=di2*A[7], out->A[8]=di2*A[8];
+                     di1 = 2/(tb[1].max-tb[1].min);
+        double di2 = 2/(tb[2].max-tb[2].min);
+        // if the z-bounds are non-zero, we make sure to bring in the 
+        // contribution of the original z-bound size to the scaling factor.
+        // if z-bound size is zero, the expansion length calculated by 
+        // dblsurf_range_expand_3 is acceptable.
+        if (tb2orig>1e-12) {
+          di2 = di2/(tb2orig);
+        }
+
+        // We finally construct the final transformation matrix A=L.Ji.A,
+        // where L is the scaling factor matrix.
+        out->A[0]=di0*( Ji[0]*A[0] + Ji[1]*A[3] ),
+        out->A[1]=di0*( Ji[0]*A[1] + Ji[1]*A[4] ),
+        out->A[2]=di0*( Ji[0]*A[2] + Ji[1]*A[5] ),
+        out->A[3]=di1*( Ji[2]*A[0] + Ji[3]*A[3] ),
+        out->A[4]=di1*( Ji[2]*A[1] + Ji[3]*A[4] ),
+        out->A[5]=di1*( Ji[2]*A[2] + Ji[3]*A[5] ),
+        out->A[6]=di2*A[6],
+        out->A[7]=di2*A[7],
+        out->A[8]=di2*A[8];
       }
     }
   }
