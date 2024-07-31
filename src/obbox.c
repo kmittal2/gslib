@@ -444,39 +444,40 @@ void printit_coords( const double *x, const double *y, const double *z,
   printf("\n");
 }
 
-void dblsurf_range_expand_2(struct dbl_range *m, struct dbl_range b[2], double tol)
+/* Calculates the diagonal length of the bounding box and expands its bounds by
+ * 0.5*len*tol at both its min and max values.
+ * Returns the length of the diagonal (could be used for expanding obboxes).
+ */
+double dblsurf_range_expand_2(struct dbl_range *m, struct dbl_range b[2], double tol, double len)
 {
   // amount of expansion in each physical dimension beyond current obbox bounds
-  double l[2] = {(b[0].max-b[0].min)*0.5*tol,
-                 (b[1].max-b[1].min)*0.5*tol};
-  for (int i=0; i<2; i++) {
-    if (l[i]<1e-12) {  // FIXME: 1e-12 is arbitrary
-      l[i] = l[(i+1)%2];
-      break;
-    }
+  if (len<1e-12) { // FIXME: 1e-12 is arbitrary
+    double l[2] = { b[0].max-b[0].min, b[1].max-b[1].min };
+    len = sqrt( l[0]*l[0] + l[1]*l[1] )*0.5*tol;
   }
   for (int i=0; i<2; i++) {
-    m[i].min = b[i].min - l[i];
-    m[i].max = b[i].max + l[i];
+    m[i].min = b[i].min - len;
+    m[i].max = b[i].max + len;
   }
+  return len;
 }
 
-void dblsurf_range_expand_3(struct dbl_range *m, struct dbl_range b[3], double tol)
+/* Calculates the diagonal length of the bounding box and expands its bounds by
+ * 0.5*len*tol at both its min and max values.
+ * Returns the length of the diagonal (could be used for expanding obboxes).
+ */
+double dblsurf_range_expand_3(struct dbl_range *m, struct dbl_range b[3], double tol, double len)
 {
   // amount of expansion in each physical dimension beyond current obbox bounds
-  double l[3] = {(b[0].max-b[0].min)*0.5*tol,
-                 (b[1].max-b[1].min)*0.5*tol,
-                 (b[2].max-b[2].min)*0.5*tol};
-  for (int i=0; i<3; i++) {
-    if (l[i]<1e-12) {  // FIXME: 1e-12 is arbitrary
-      l[i] = 0.5*( l[(i+1)%3] + l[(i+2)%3] ); // At least two directions will have non-zero expansion lengths
-      break;
-    }
+  if (len<1e-12) { // FIXME: 1e-12 is arbitrary
+    double l[3] = { b[0].max-b[0].min, b[1].max-b[1].min, b[2].max-b[2].min };
+    len = sqrt( l[0]*l[0] + l[1]*l[1] + l[2]*l[2] )*0.5*tol;
   }
   for (int i=0; i<3; i++) {
-    m[i].min = b[i].min - l[i];
-    m[i].max = b[i].max + l[i];
+    m[i].min = b[i].min - len;
+    m[i].max = b[i].max + len;
   }
+  return len;
 }
 
 void obboxsurf_calc_2(        struct obbox_2 *out,
@@ -579,7 +580,8 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
       #undef DO_EDGE
       #undef DO_BOUND
 
-      dblsurf_range_expand_2(out->x, ab, tol);
+      double tol_len;
+      tol_len = dblsurf_range_expand_2(out->x, ab, tol, 0.0);
 
       // av0 and av1 are the rotated AABB center coordinates and are hence
       // the offset of the OBB center with respect to the element center
@@ -594,7 +596,7 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
       out->c0[0] = x0[0] + dx0;
       out->c0[1] = x0[1] + dx1;
 
-      dblsurf_range_expand_2(tb, tb, tol);
+      tol_len = dblsurf_range_expand_2(tb, tb, tol, 0.0);
       // printit_obbox_dbl_range(&tb[0],"tb0-expanded");
       // printit_obbox_dbl_range(&tb[1],"tb1-expanded");
       const double di0 = 2/(tb[0].max-tb[0].min),
@@ -713,12 +715,11 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       }
 
       /* At this stage, the normal vector has been aligned with the z-axis. We
-       * still need to align the element in xy-plane.
-       * For that, we use the inverse of the Jacobian at the rotated element 
-       * center to transform the projection of the rotated element on xy-plane
-       * to the reference space [-1,1]x[-1,1].
-       * This transformation is premultiplied to A to get the final transformation
-       * matrix.
+       * still need to align the element in xy-plane. For that, we use the
+       * inverse of the Jacobian at the rotated element center to transform the
+       * projection of the rotated element on xy-plane to the reference space
+       * [-1,1]x[-1,1]. This transformation is premultiplied to A to get the
+       * a new transformation matrix.
        */
 
       /* double work[2*m##r*(n##s+m##s+1)] */
@@ -732,14 +733,18 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       DO_BOUND(ab[0],r,s,x,work);
       DO_BOUND(ab[1],r,s,y,work);
       DO_BOUND(ab[2],r,s,z,work);
-      // Expand the AA-bounds based on the tol
-      dblsurf_range_expand_3(out->x, ab, tol);
+      // Expand the AA-bounds based on the tol, and save the expansion length 
+      // in tol_len.
+      double tol_len = dblsurf_range_expand_3(out->x, ab, tol, 0.0);
 
       double xtfm[3*nrs]; // xtfm[0]:x, xtfm[nrs]:y, xtfm[2*nrs]:z
       // Obtain the GLL nodes, when rotated by A and translated to (0,0).
       bbox_3_tfm(xtfm, x0,A, x,y,z,nrs);
       // The rotated z-coords are used to calculate z-bounds.
       DO_BOUND(tb[2],r,s,xtfm+2*nrs,work);
+      // expand in z-direction by AABB expansion length tol_len
+      tb[2].min -= tol_len;
+      tb[2].max += tol_len;
 
       // Also apply A to the tangent vectors, which allows us to calculate 
       // the Jacobian matrix at the rotated element center.
@@ -759,20 +764,21 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
         xtfm[    i] = Ji[0]*xt + Ji[1]*yt;
         xtfm[nrs+i] = Ji[2]*xt + Ji[3]*yt;
       }
-      // Bound these reference space xy coordinates
+      // Bound these reference space xy coordinates, and expand the 
+      // corresponding bounds.
       DO_BOUND(tb[0],r,s,xtfm    ,work);
       DO_BOUND(tb[1],r,s,xtfm+nrs,work);
-
+      tol_len = dblsurf_range_expand_2(tb,tb,tol,0.0);
       #undef DO_BOUND
 
-      // printit_obbox_dbl_range(&tb[0],"tb0");
-      // printit_obbox_dbl_range(&tb[1],"tb1");
-      // printit_obbox_dbl_range(&tb[2],"tb2");
+      // printit_obbox_dbl_range(&tb[0],"tb0-expanded");
+      // printit_obbox_dbl_range(&tb[1],"tb1-expanded");
+      // printit_obbox_dbl_range(&tb[2],"tb2-expanded");
 
       /* Calculate the center of the OBBOX obtained from Ji.A.x element, and 
        * store it in {av0,av1,av2}.
-       * Then calculate Ainv.J.{av0,av1,av2} to obtain the position vector of 
-       * OBBOX center relative to element center.
+       * Then calculate Ainv.J.{av0,av1,av2} to obtain the physical position
+       * vector of OBBOX center relative to element center.
        * This position vector is then added to the element center to obtain the
        * OBBOX center in physical space.
        */
@@ -790,33 +796,13 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       // Finally, we premultiply the scaling matrix to Ji.A to obtain the final
       // transformation matrix.
       {
-        double tb2orig = tb[2].max-tb[2].min;
-        // if the z-bounds are non-zero, we rescale z-bounds to size 2.
-        // This is to make sure that the expansion length added in all 3 
-        // directions are consistently scaled.
-        if (tb2orig>1e-12) {
-          const double temp = 2/tb2orig;
-          tb[2].min *= temp;
-          tb[2].max *= temp;
-        }
-        dblsurf_range_expand_3(tb,tb,tol);
-        // printit_obbox_dbl_range(&tb[0],"tb0-expanded");
-        // printit_obbox_dbl_range(&tb[1],"tb1-expanded");
-        // printit_obbox_dbl_range(&tb[2],"tb2-expanded");
 
         const double di0 = 2/(tb[0].max-tb[0].min),
-                     di1 = 2/(tb[1].max-tb[1].min);
-        double di2 = 2/(tb[2].max-tb[2].min);
-        // if the z-bounds are non-zero, we make sure to bring in the 
-        // contribution of the original z-bound size to the scaling factor.
-        // if z-bound size is zero, the expansion length calculated by 
-        // dblsurf_range_expand_3 is acceptable.
-        if (tb2orig>1e-12) {
-          di2 = di2/(tb2orig);
-        }
+                     di1 = 2/(tb[1].max-tb[1].min),
+                     di2 = 2/(tb[2].max-tb[2].min);
 
         // We finally construct the final transformation matrix A=L.Ji.A,
-        // where L is the scaling factor matrix.
+        // where L is the scaling matrix.
         out->A[0]=di0*( Ji[0]*A[0] + Ji[1]*A[3] ),
         out->A[1]=di0*( Ji[0]*A[1] + Ji[1]*A[4] ),
         out->A[2]=di0*( Ji[0]*A[2] + Ji[1]*A[5] ),
@@ -829,6 +815,5 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       }
     }
   }
-  
   free(data);
 }
