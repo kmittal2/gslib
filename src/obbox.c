@@ -495,8 +495,6 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
   double *data;
   const unsigned lbsize0 = lob_bnd_size(nr,mr);
 
-  // printf("nel %u, lbsize0 %u\n", nel, lbsize0);
-
   unsigned wsize = 2*nr+2*mr;
   DO_MAX(wsize,gll_lag_size(nr));
 
@@ -627,8 +625,6 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
   const unsigned lbsize0 = lob_bnd_size(nr,mr),
                  lbsize1 = lob_bnd_size(ns,ms);
 
-  // printf("nel %u, lbsize0 %u, lbsize1 %u\n", nel, lbsize0, lbsize1);
-
   unsigned wsize = 3*nr*ns+2*mr*(ns+ms+1);
   DO_MAX(wsize,2*nr*ns+3*nr);
   DO_MAX(wsize,gll_lag_size(nr));
@@ -654,9 +650,6 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
     
     uint nelorig = nel;
     for(; nel; --nel,x+=nrs,y+=nrs,z+=nrs,++out) {
-      // printf("nelID: %u\n", nelorig-nel);
-      // printit_coords(x, y, z, nrs, 3, "3D");
-
       struct dbl_range ab[3];
       struct dbl_range tb[3];
       double x0[3], tv[9], A[9];
@@ -683,11 +676,6 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       tv[8] = tv[8]/nmag;
       // At this point, we have tv = [tangent_r tangent_s normal]^T, only 
       // the normal vector is normalized.
-
-      // printf("x0: %g %g %g\n", x0[0], x0[1], x0[2]);
-      // printf("tv1: %g %g %g\n", tv[0], tv[1], tv[2]);
-      // printf("tv2: %g %g %g\n", tv[3], tv[4], tv[5]);
-      // printf("normal: %g %g %g\n", tv[6], tv[7], tv[8]);
 
       // Calculate the anticlockwise rotation theta_x about x-axis needed to
       // bring the normal vector into the xz plane, say theta_x.

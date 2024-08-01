@@ -734,16 +734,7 @@ struct findpts_data *findptssurf_setup( const struct comm *const comm,
                             ims );
   hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,global_hash_size,&fd->cr);
 
-  // printf("\n----------------------\nGlobal Hash data\n----------------------\n");
-  // printf("%llu %f %f - hashn and hashfac\n",fd->hash.hash_n,fd->hash.fac[0],fd->hash.fac[1]);
-  // printf("%f %f %f %f - hashbounds\n",fd->hash.bnd[0].min,fd->hash.bnd[0].max,fd->hash.bnd[1].min,fd->hash.bnd[1].max);
-  // for (int i=0; i<fd->hash.hash_n*fd->hash.hash_n; i++) {
-  //     printf("%u ",fd->hash.offset[i]);
-  // }
-  // printf(" - hashoffset\n\n");
-
   fd->fevsetup = 0;
-  // printf("findptssurf_setup done\n\n");
   return fd;
 }
 

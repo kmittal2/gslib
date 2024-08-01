@@ -360,14 +360,6 @@ void findptssurfms_local_setup( struct findpts_local_data *const fd,
   obboxsurf_calc(fd->obb,elx,n,nel,m,bbox_tol);
   hash_build(&fd->hd,fd->obb,nel,max_hash_size);
 
-  // printf("\n----------------------\nLocal Hash data\n----------------------\n");
-  // printf("%u %f %f - hashn and hashfac\n",fd->hd.hash_n,fd->hd.fac[0],fd->hd.fac[1]);
-  // printf("%f %f %f %f - hashbounds\n",fd->hd.bnd[0].min,fd->hd.bnd[0].max,fd->hd.bnd[1].min,fd->hd.bnd[1].max);
-  // for (int i=0; i<fd->hd.hash_n*fd->hd.hash_n; i++) {
-  //     printf("%u ",fd->hd.offset[i]);
-  // }
-  // printf(" - hashoffset\n\n");
-
   // findpts_el_setup(&fd->fed,n,npt_max);
   fd->tol = newt_tol;
   fd->ims = ims;
@@ -375,7 +367,6 @@ void findptssurfms_local_setup( struct findpts_local_data *const fd,
    fd->distrsti = tmalloc(double, npt_max);
    fd->distfint = distfint;
   }
-  // printf("findptssurfms_local_setup done\n\n");
 }
 
 void findptsms_local_free(struct findpts_local_data *const fd)
