@@ -599,10 +599,11 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
       // printit_obbox_dbl_range(&tb[1],"tb1-expanded");
       const double di0 = 2/(tb[0].max-tb[0].min),
                    di1 = 2/(tb[1].max-tb[1].min);
-      // The scaling matrix is premultiplied to the rotation matrix
+      // The scaling matrix is premultiplied to the rotation matrix to obtain
+      // the final transformation needed to move a location relative to the OBB
+      // center to a space in [-1,1]^2.
       out->A[0]=di0*A[0], out->A[1]=di0*A[1];
       out->A[2]=di1*A[2], out->A[3]=di1*A[3];
-
       // printit(out->c0, 2, "center out->c0");
     }
   }
@@ -638,7 +639,23 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
     double *const lob_bnd_data_r = data + 2*(nr+ns),
            *const lob_bnd_data_s = data + 2*(nr+ns) + lbsize0;
     double *const work           = data + 2*(nr+ns) + lbsize0 + lbsize1;
-    
+
+    /* All the calculation in SETUP_DIR is done for the reference space. So the
+     * question arises: why r and s are treated separately?  This is because
+     * James assumed that the r and s directions could have different number of
+     * nodes. For us, that is not the case. So, we can just do this calculation
+     * in one direction and use everywhere.
+     * 1. lag would store a pointer to a function of type lagrange_fun, 
+     *    pointing to the correct function to evaluate the lagrange polynomials
+     *    on nr GLL nodes.
+     * 2. gll_lag_setup returns correct lag_coeff function and stores
+     *    lag_coeffs (based on ref coords) in work for evaluating the lagrange
+     *    polynomials.
+     * 3. the coefficients in work are utilized to evaluate the lagrange
+     *    polynomials and their 1st derivatives at x=0 (or r=0) in I0##r.
+     * 4. lob_bnd_setup assigns to lob_bnd_data_##r, which is used to compute
+     *    bounds
+     */
     #define SETUP_DIR(r) do { \
       lagrange_fun *const lag = gll_lag_setup(work, n##r); \
       lag(I0##r, work,n##r,1, 0); \
@@ -649,6 +666,7 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
     #undef SETUP_DIR
     
     uint nelorig = nel;
+    // Loop over all elements; note the decrementing nel
     for(; nel; --nel,x+=nrs,y+=nrs,z+=nrs,++out) {
       struct dbl_range ab[3];
       struct dbl_range tb[3];
@@ -656,16 +674,22 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
  
       /* double work[2*nr]
        * Find the center of the element (r=0 ref. coord.) in physical space
+       * and store in x0.
+       * tv[0], tv[1], tv[2]: kept empty at this point for convenience.
+       * tv[3], tv[4]: dx/dr, dx/ds
+       * tv[5], tv[6]: dy/dr, dy/ds
+       * tv[7], tv[8]: dz/dr, dz/ds
        */
       x0[0] = tensor_ig2(tv+3, I0r,nr, I0s,ns, x, work);
       x0[1] = tensor_ig2(tv+5, I0r,nr, I0s,ns, y, work);
       x0[2] = tensor_ig2(tv+7, I0r,nr, I0s,ns, z, work);
 
-      // tangent vector 1
+      // tangent vector 1 moved to tv[0], tv[1], tv[2]
       tv[0] = tv[3], tv[1] = tv[5], tv[2] = tv[7];
-      // tangent vector 2
+      // tangent vector 2 moved to tv[3], tv[4], tv[5]
       tv[3] = tv[4], tv[4] = tv[6], tv[5] = tv[8];
       // normal vector to the plane formed by t1 and t2 (cross product)
+      // is stored in tv[6], tv[7], tv[8]
       tv[6] = tv[1]*tv[5] - tv[2]*tv[4];
       tv[7] = tv[2]*tv[3] - tv[0]*tv[5];
       tv[8] = tv[0]*tv[4] - tv[1]*tv[3];
@@ -677,16 +701,34 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       // At this point, we have tv = [tangent_r tangent_s normal]^T, only 
       // the normal vector is normalized.
 
-      // Calculate the anticlockwise rotation theta_x about x-axis needed to
-      // bring the normal vector into the xz plane, say theta_x.
-      // Also calculate the anticlockwise rotation about y-axis needed to 
-      // align the normal vector to the z-axis, say theta_y.
-      if (fabs(tv[7])>1e-12) { // if normal vector is not parallel to xz plane
-        const double magyz   = sqrt( tv[7]*tv[7] + tv[8]*tv[8] ); // n's projection on the yz plane
-        const double cthetax = tv[8]/magyz, // cos(theta_x)
-                     sthetax = tv[7]/magyz, // sin(theta_x)
-                     cthetay = magyz,       // cos(theta_y)
-                     sthetay = -tv[6];      // sin(theta_y)
+      // if normal vector is not already parallel to xz plane
+      if (fabs(tv[7])>1e-12) {
+        // Calculate the magnitude of the projection of the normal vector on the
+        // yz plane.
+        const double magyz = sqrt( tv[7]*tv[7] + tv[8]*tv[8] );
+        // Let theta be the anticlockwise angle FROM the y-axis TO the
+        // yz-projection of the normal vector. Then,
+        // cos(theta) = tv[7]/magyz & sin(theta) = tv[8]/magyz.
+        // Then the anticlockwise rotation about x-axis, say theta_x, needed to
+        // bring the normal vector parallel to the xz plane is (pi/2 - theta).
+        // cos(theta_x) = cos(pi/2 - theta) = sin(theta)
+        // sin(theta_x) = sin(pi/2 - theta) = cos(theta)
+        const double cthetax = tv[8]/magyz,
+                     sthetax = tv[7]/magyz;
+
+        // Let the anticlockwise angle from the z-axis to the rotated normal
+        // vector be theta. Also, its z-component would be magyz, i.e., the 
+        // yz-projection rotated parallel to xz-plane. Then,
+        // cos(theta) = magyz & sin(theta) = tv[6].
+        // Then the rotation about y-axis required to get the normal vector
+        // to align with the z-axis is theta_y := -theta. Hence:
+        // cos(theta_y) = cos(-theta) = cos(theta)
+        // sin(theta_y) = sin(-theta) = -sin(theta)
+        const double cthetay = magyz,
+                     sthetay = -tv[6];
+
+        // The rotation matrix that rotates the normal vector to the z-axis.
+        // Product of the two rotation matrices due to rotation about x and y.
         A[0] =  cthetay, A[1] = sthetax*sthetay, A[2] = cthetax*sthetay;
         A[3] =  0,       A[4] = cthetax,         A[5] = -sthetax;
         A[6] = -sthetay, A[7] = sthetax*cthetay, A[8] = cthetax*cthetay;
@@ -703,11 +745,15 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       }
 
       /* At this stage, the normal vector has been aligned with the z-axis. We
-       * still need to align the element in xy-plane. For that, we use the
-       * inverse of the Jacobian at the rotated element center to transform the
-       * projection of the rotated element on xy-plane to the reference space
-       * [-1,1]x[-1,1]. This transformation is premultiplied to A to get the
-       * a new transformation matrix.
+       * still need to align the element in xy-plane. The process is as follows:
+       * 1. We first translate all nodes to the element center.
+       * 2. We then rotate the translated nodes by A.
+       * 3. At this stage, we can obtain the z-bounds and expand them.
+       * 4. We then calculate the Jacobian matrix at the rotated element center.
+       *    This is done by applying A to the tangent vectors.
+       * 5. We then calculate the inverse of this Jacobian matrix.
+       * 6. Premultiplying the inverse Jacobian matrix to the rotated x,y
+       *    coordinates gives their reference space coords.
        */
 
       /* double work[2*m##r*(n##s+m##s+1)] */
@@ -726,18 +772,20 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       double tol_len = dblsurf_range_expand_3(out->x, ab, tol, 0.0);
 
       double xtfm[3*nrs]; // xtfm[0]:x, xtfm[nrs]:y, xtfm[2*nrs]:z
-      // Obtain the GLL nodes, when rotated by A and translated to (0,0).
+      // Obtain the GLL nodes, when translated to (0,0) and rotated by A. The
+      // element center would be at (0,0).
       bbox_3_tfm(xtfm, x0,A, x,y,z,nrs);
       // The rotated z-coords are used to calculate z-bounds.
       DO_BOUND(tb[2],r,s,xtfm+2*nrs,work);
       // expand in z-direction by AABB expansion length tol_len
+      // FIXME: a better choice for expansion length?
       tb[2].min -= tol_len;
       tb[2].max += tol_len;
 
-      // Also apply A to the tangent vectors, which allows us to calculate 
-      // the Jacobian matrix at the rotated element center.
-      // NOTE that the z components of the rotated tangent vectors will become
-      // zero, since the normal vector is aligned with the z-axis.
+      // Also apply A to the tangent vectors, which allows us to calculate the
+      // Jacobian matrix at the rotated element center. NOTE that the z
+      // components of the rotated tangent vectors will become zero, since the
+      // normal vector is aligned with the z-axis.
       double J[4], Ji[4];
       J[0] = A[0]*tv[0] + A[1]*tv[1] + A[2]*tv[2]; // rotated dx/dr
       J[1] = A[0]*tv[3] + A[1]*tv[4] + A[2]*tv[5]; // rotated dx/ds
@@ -745,52 +793,69 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       J[3] = A[3]*tv[3] + A[4]*tv[4] + A[5]*tv[5]; // rotated dy/ds
       mat_inv_2(Ji, J);
 
-      // Now transform the already rotated x,y coordinates according to Ji
-      // to their reference space.
+      // Now transform the already rotated x,y coordinates according to Ji to
+      // their reference space.
+      // Important to note that the nodes used here already have their element
+      // center at (0,0). Hence, Ji can be directly applied to them.
       for(unsigned i=0;i<nrs;++i) {
         const double xt = xtfm[i], yt = xtfm[nrs+i];
         xtfm[    i] = Ji[0]*xt + Ji[1]*yt;
         xtfm[nrs+i] = Ji[2]*xt + Ji[3]*yt;
       }
-      // Bound these reference space xy coordinates, and expand the 
-      // corresponding bounds.
+      // Bound these reference space xy coordinates
       DO_BOUND(tb[0],r,s,xtfm    ,work);
       DO_BOUND(tb[1],r,s,xtfm+nrs,work);
+      // Expand the bounds based on the tol
       tol_len = dblsurf_range_expand_2(tb,tb,tol,0.0);
       #undef DO_BOUND
 
-      // printit_obbox_dbl_range(&tb[0],"tb0-expanded");
-      // printit_obbox_dbl_range(&tb[1],"tb1-expanded");
-      // printit_obbox_dbl_range(&tb[2],"tb2-expanded");
-
-      /* Calculate the center of the OBBOX obtained from Ji.A.x element, and 
-       * store it in {av0,av1,av2}.
-       * Then calculate Ainv.J.{av0,av1,av2} to obtain the physical position
-       * vector of OBBOX center relative to element center.
-       * This position vector is then added to the element center to obtain the
-       * OBBOX center in physical space.
+      /* We now have a BB whose bounds represent bounds of a OBB around the 
+       * original element.
+       * 
+       * We calculate the center of the OBB in physical space by calculating the
+       * center of this BB, which is the same as the displacement needed to move
+       * from the element center in the transformed space to the BB center. This
+       * displacement is then untransformed by applying (Ji.A)^-1 to it, and 
+       * added to known physical element center.
+       *
+       * This BB does not necessarily have known fixed size like [-1,1].
+       * So, we premultiply a length scaling matrix, say L, to Ji.A to L.Ji.A.
+       * This is the total transformation needed to move a physical location
+       * that is inside the physical OBB to a location within [-1,1]^3.
+       * Any transformed point not in [-1,1]^3 is outside the OBB.
+       * 
+       * It must be noted: this transformation matrix is only applied to points
+       * that have been translated by the physical OBB center.
        */
       {
+        // The center of the BB in the transformed space
         const double av0 = (tb[0].min+tb[0].max)/2,
                      av1 = (tb[1].min+tb[1].max)/2,
                      av2 = (tb[2].min+tb[2].max)/2;
+        // First untransform the x,y coordinates by J to obtain all components
+        // in the rotated space (since z-component is in the rotated space).
         const double Jav0 = J[0]*av0 + J[1]*av1,
                      Jav1 = J[2]*av0 + J[3]*av1;
+        // The physical displacement needed to move from the element center to
+        // the OBB center is calculated by "un"rotating {Jav0,Jav1,av2} by 
+        // applying inverse of A.
+        // The physical untransformed OBB center can then be obtained.
         out->c0[0] = x0[0] + A[0]*Jav0 + A[3]*Jav1 + A[6]*av2,
         out->c0[1] = x0[1] + A[1]*Jav0 + A[4]*Jav1 + A[7]*av2,
         out->c0[2] = x0[2] + A[2]*Jav0 + A[5]*Jav1 + A[8]*av2;
       }
 
-      // Finally, we premultiply the scaling matrix to Ji.A to obtain the final
-      // transformation matrix.
+      // Finally, obtain (L.Ji.A) and store it in out->A
       {
-
+        // The scaling matrix L's diagonal terms, needed to scale the
+        // transformation to [-1,1]^3.
         const double di0 = 2/(tb[0].max-tb[0].min),
                      di1 = 2/(tb[1].max-tb[1].min),
                      di2 = 2/(tb[2].max-tb[2].min);
 
-        // We finally construct the final transformation matrix A=L.Ji.A,
-        // where L is the scaling matrix.
+        // We finally construct the final transformation matrix A=L.Ji.A.
+        // This maps a position relative to OBB center to a position in
+        // [-1,1]^3, if the position is inside the OBB.
         out->A[0]=di0*( Ji[0]*A[0] + Ji[1]*A[3] ),
         out->A[1]=di0*( Ji[0]*A[1] + Ji[1]*A[4] ),
         out->A[2]=di0*( Ji[0]*A[2] + Ji[1]*A[5] ),
