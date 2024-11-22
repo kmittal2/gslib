@@ -28,20 +28,6 @@
 #include <stdio.h>
 #endif
 
-void printit_fpt_el2(const double *p, const int size, char *myString)
-{
-    printf("Printing %s\n",myString);
-    for (int i = 0; i < size;)
-    {
-        for (int j = 0; j < 8 && i < size; j++)
-        {
-            printf("%g ",p[i]);
-            i++;
-        }
-        printf("\n");
-    }
-}
-
 /* A is row-major */
 static void lin_solve_2(double x[2], const double A[4], const double y[2])
 {
@@ -86,7 +72,7 @@ static unsigned pt_flags_to_bin(const unsigned flags)
 }
 
 /* assumes x = 0, or 1  */
-static unsigned plus_1_mod_2(const unsigned x) { return x^1u; } 
+static unsigned plus_1_mod_2(const unsigned x) { return x^1u; }
 
 /* assumes x = 1 << i, with i < 4, returns i+1 */
 static unsigned which_bit(const unsigned x)
@@ -123,9 +109,9 @@ struct findpts_el_data_2 {
   lagrange_fun *lag[2];
   double *lag_data[2];
   double *wtend[2];
-  
+
   const double *x[2];
-  
+
   unsigned side_init;
   double *sides;
   struct findpts_el_gedge_2 edge[4]; /* R=-1 S; R=1 S; ... */
@@ -180,14 +166,14 @@ void findpts_el_setup_2(struct findpts_el_data_2 *const fd,
   fd->work        = fd->sides + tot;
 
   fd->side_init = 0;
-  
+
   for(d=0;d<2;++d) {
     double *wt=fd->wtend[d]; unsigned n=fd->n[d];
     lobatto_nodes(fd->z[d],n);
     fd->lag[d] = gll_lag_setup(fd->lag_data[d],n);
     fd->lag[d](wt    , fd->lag_data[d],n,2,-1);
     fd->lag[d](wt+3*n, fd->lag_data[d],n,2, 1);
-    
+
     wt[0]=1; for(i=1;i<n;++i) wt[i]=0;
     wt+=3*n; { for(i=0;i<n-1;++i) wt[i]=0; } wt[i]=1;
   }
@@ -364,9 +350,9 @@ static void newton_area(struct findpts_el_pt_2 *const out,
   double r0[2];
   double dr[2], fac;
   unsigned d, mask, flags;
-  
+
   r0[0] = p->r[0], r0[1] = p->r[1];
-  
+
 #ifdef DIAGNOSTICS_1
   printf("newton_area:\n");
   printf("  resid = (%g,%g); r^T r / 2 = %g\n",resid[0],resid[1],
@@ -382,7 +368,7 @@ static void newton_area(struct findpts_el_pt_2 *const out,
     if(r0[d]-tr>-1) bnd[2*d  ]=r0[d]-tr, mask^=1u<<(2*d);
     if(r0[d]+tr< 1) bnd[2*d+1]=r0[d]+tr, mask^=2u<<(2*d);
   }
-  
+
   lin_solve_2(dr, jac,resid);
 
 #ifdef DIAGNOSTICS_1
@@ -405,9 +391,9 @@ static void newton_area(struct findpts_el_pt_2 *const out,
 #ifdef DIAGNOSTICS_1
   printf("  flags = %x, fac = %.15g\n",flags,fac);
 #endif
-  
+
   if(flags==0) goto newton_area_fin;
-  
+
   for(d=0;d<2;++d) dr[d]*=fac;
 
   newton_area_edge: {
@@ -555,7 +541,7 @@ static void newton_edge(struct findpts_el_pt_2 *const out,
   if((tnr=oldr+tr)< 1) tdr=tr;
   else                 tnr= 1, tdr= 1-oldr, tnew_flags = flags | 2u<<(2*de);
   tv=EVAL(tdr);
-  
+
   if(tv<v) nr=tnr, dr=tdr, v=tv, new_flags=tnew_flags;
 
 newton_edge_fin:
@@ -591,7 +577,6 @@ static void findpt_area(
     fd->lag[0](wtr+2*i*nr, fd->lag_data[0], nr, 1, p[i].r[0]);
   for(i=0;i<pn;++i)
     fd->lag[1](wts+2*i*ns, fd->lag_data[1], ns, 1, p[i].r[1]);
-//  printf("%f %f-k10-initr \n",p[0].r[0],p[0].r[1]);
   for(d=0;d<2;++d) {
     tensor_mxm(slice,nr, fd->x[d],ns, wts,2*pn);
     for(i=0;i<pn;++i) {
@@ -600,7 +585,6 @@ static void findpt_area(
       double dum = tensor_ig1(jac_i,
                               wtr_i,nr, slice_i);
       resid[2*i+d] = p[i].x[d] - dum;
-//      printf("%u %u %f %f-k10dix-x*\n",d,i,p[i].x[d],dum);
       jac_i[1] = tensor_i1(wtr_i,nr, slice_i+nr);
     }
   }
@@ -612,9 +596,6 @@ static void findpt_area(
   }
 }
 
-//edge index is 0,1,2,3 in reverse order for CSSRR i.e. R = -1 is 0, R=1 = 1.
-// dn is 0,0,1,1
-// de is 1,1,0,0
 /* work[(10+3*n)*pn] */
 static void findpt_edge(
   struct findpts_el_pt_2 *const out,
@@ -647,15 +628,15 @@ static void findpt_edge(
     for(i=0;i<pn;++i) {
       const double *const slice_i = slice+3*i;
       double r;
-      resid[2*i+d] = r = p[i].x[d] - slice_i[0]; //x*-x
-      jac[4*i+2*d+de] = slice_i[1]; //dxdt and dydt
-      hes[i] += r * slice_i[2]; //d2x/dt2 + d2y/dt2
+      resid[2*i+d] = r = p[i].x[d] - slice_i[0];
+      jac[4*i+2*d+de] = slice_i[1];
+      hes[i] += r * slice_i[2];
     }
   }
   for(i=1;i<pn;++i) memcpy(wt+i*n, wt+3*i*n, n*sizeof(double));
   for(d=0;d<2;++d) {
     tensor_mtxv(slice,pn, wt, edge->dxdn[d],n);
-    for(i=0;i<pn;++i) jac[4*i+2*d+dn] = slice[i]; //dxdn and dydn
+    for(i=0;i<pn;++i) jac[4*i+2*d+dn] = slice[i];
   }
 
   /* perform Newton step */
@@ -756,7 +737,7 @@ static void seed(struct findpts_el_data_2 *const fd,
 void findpts_el_2(struct findpts_el_data_2 *const fd, const unsigned npt,
                   const double tol)
 {
-  findpt_fun *const fun[3] = 
+  findpt_fun *const fun[3] =
     { &findpt_area, &findpt_edge, &findpt_pt };
   struct findpts_el_pt_2 *const pbuf = fd->p, *const pstart = fd->p + npt;
   unsigned nconv = npt;
@@ -775,12 +756,11 @@ void findpts_el_2(struct findpts_el_data_2 *const fd, const unsigned npt,
     }
   }
   while(nconv && step++ < 50) {
-//    printf("Newton iter %u\n",step);
     /* advance each group of points */
     struct findpts_el_pt_2 *p, *const pe=pstart+nconv, *pout; unsigned pn;
-    
+
 #if DIAGNOSTICS_ITERATIONS>1
-    { unsigned i; 
+    { unsigned i;
       printf("findpts_el_2 Newton step (%u), %u unconverged:\n ", step,nconv);
       for(i=0;i<9;++i) printf(" %u",count[i]);
       printf("\n");
@@ -790,7 +770,6 @@ void findpts_el_2(struct findpts_el_data_2 *const fd, const unsigned npt,
     for(p=pstart,pout=pbuf; p!=pe; p+=pn,pout+=pn) {
       const unsigned pflags = p->flags & FLAG_MASK;
       pn = count[pt_flags_to_bin_noC(pflags)];
-//      printf("flags %u\n",pflags);
       fun[num_constrained(pflags)](pout, fd, p,pn, tol);
     }
     /* group points by contsraints */
@@ -833,7 +812,7 @@ void findpts_el_eval_2(
     fd->lag[1](wts+i*ns, fd->lag_data[1], ns, 0, r[1]);
     r = (const double*)((const char*)r + r_stride);
   }
-  
+
   tensor_mxm(slice,nr, in,ns, wts,pn);
   for(i=0,out=out_base;i<pn;++i) {
     const double *const wtr_i = wtr+i*nr, *const slice_i = slice+i*nr;

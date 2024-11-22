@@ -77,16 +77,6 @@ static struct dbl_range dbl_range_expand(struct dbl_range b, double tol)
   return m;
 }
 
-static void bbox_1_tfm(double *out, const double x0[2], const double Ji[4],
-                       const double *x, const double *y, unsigned n)
-{
-  unsigned i;
-  for(i=0;i<n;++i) {
-    const double dx = x[i]-x0[0], dy = y[i]-x0[1];
-    out[  i] = Ji[0]*dx + Ji[1]*dy;
-  }
-}
-
 static void bbox_2_tfm(double *out, const double x0[2], const double Ji[4],
                        const double *x, const double *y, unsigned n)
 {
@@ -139,27 +129,6 @@ double obbox_test_2(const struct obbox_2 *const b,
 
 #define DO_MAX(a,b) do { unsigned temp = b; if(temp>a) a=temp; } while(0)
 
-//printf("global bounding box (%g^%u):\n",(double)p->hash_n,D);
-
-void printit(const double *p, const int size, char *myString)
-{
-    printf("Printing %s\n",myString);
-    for (int i = 0; i < size;)
-    {
-        for (int j = 0; j < 16 && i < size; j++)
-        {
-            printf("%g ",p[i]);
-            i++;
-        }
-        printf("\n");
-    }
-}
-
-void printit_obbox_dbl_range(const struct dbl_range *p, char *myString)
-{
-    printf("dbl_range %s: (%g %g)\n", myString, p->min, p->max );
-}
-
 void obbox_calc_2(struct obbox_2 *out,
                   const double *const elx[2],
                   const unsigned n[2], uint nel,
@@ -179,9 +148,6 @@ void obbox_calc_2(struct obbox_2 *out,
   DO_MAX(wsize,gll_lag_size(ns));
   data = tmalloc(double, 2*(nr+ns)+lbsize0+lbsize1+wsize);
 
-//  printit(x, nr*nr, "x coordinates");
-//  printit(y, nr*nr, "y coordinates");
-
   {
     double *const I0r = data, *const I0s = data+2*nr;
     double *const lob_bnd_data_r = data+2*(nr+ns),
@@ -193,46 +159,27 @@ void obbox_calc_2(struct obbox_2 *out,
       lag(I0##r, work,n##r,1, 0); \
       lob_bnd_setup(lob_bnd_data_##r, n##r,m##r); \
     } while(0)
-    
+
     SETUP_DIR(r); SETUP_DIR(s);
-    
+
     #undef SETUP_DIR
 
-//    printit(lob_bnd_data_r, nr*mr, "lob_bnd_data_r");
-    
     for(;nel;--nel,x+=nrs,y+=nrs,++out) {
       double x0[2], J[4], Ji[4];
       struct dbl_range ab[2], tb[2];
-  
+
       /* double work[2*nr] */
       x0[0] = tensor_ig2(J  , I0r,nr, I0s,ns, x, work);
       x0[1] = tensor_ig2(J+2, I0r,nr, I0s,ns, y, work);
       mat_inv_2(Ji, J);
-//      printit(J, 4, "Jacobian");
-//      printit(Ji, 4, "Jacobian inverse");
 
 
-      /* double work[2*m##r]
-         Find the bounds along a specific physical dimension, and merge with
-         existing bounds if specified.
-      */
       #define DO_BOUND(bnd,merge,r,x,work) do { \
         struct dbl_range b = \
         lob_bnd_1(lob_bnd_data_##r,n##r,m##r, x, work); \
         if(merge) bnd=dbl_range_merge(bnd,b); else bnd=b; \
       } while(0)
 
-      /* double work[2*n##r + 2*m##r]
-         Find the bounds for a edge, for all its physical dimensions, and merge 
-         with existing bounds if specified.
-         We will explain every line of the macro:
-         lines 1,2: Bound x and y physical dimensions separately and store in
-                    ab[0] and ab[1] respectively.
-         lines 3  : Transform the AABB in physical dimensions to the reference
-                    frame, and store in work.
-         lines 4,5: Bound the transformed AABB and store its ref space bounds in
-                    tb[0] and tb[1] respectively.
-      */
       #define DO_EDGE(merge,r,x,y,work) do { \
         DO_BOUND(ab[0],merge,r,x,work); \
         DO_BOUND(ab[1],merge,r,y,work); \
@@ -241,77 +188,39 @@ void obbox_calc_2(struct obbox_2 *out,
         DO_BOUND(tb[1],merge,r,(work)+n##r,(work)+2*n##r); \
       } while(0)
 
-      // Bound edge whose x and y coords start from memory pointed by "x" and "y".
-      // This is the bottom lexicographic edge of the element.
       DO_EDGE(0,r,x,y,work);
-      // printit_obbox_dbl_range(&ab[0],"ab0-E0");
-      // printit_obbox_dbl_range(&ab[1],"ab1");
-
-      // Beyond this point, any bound calculation would be merged with the existing
-      // bounds. So, 1 is passed as the first argument to DO_EDGE.
-
-      // This is the top lexicographic edge of the element.
       DO_EDGE(1,r,&x[nrs-nr],&y[nrs-nr],work);
-      // printit_obbox_dbl_range(&ab[0],"ab0-E1");
-      // printit_obbox_dbl_range(&ab[1],"ab1");
 
-      /* double work[4*ns + 2*ms]
-         Helper macro to call DO_EDGE for the left and right lexicographic edges
-         whose coords are not contiguous in memory.
-      */
       #define GET_EDGE(off) do { \
         copy_strided(work   , x+off,1,nr,ns); \
         copy_strided(work+ns, y+off,1,nr,ns); \
         DO_EDGE(1,s,work,work+ns,work+2*ns); \
       } while(0)
 
-      // This is the left lexicographic edge of the element.
       GET_EDGE(0);
-      // printit_obbox_dbl_range(&ab[0],"ab0-E2");
-      // printit_obbox_dbl_range(&ab[1],"ab1");
-
-      // This is the right lexicographic edge of the element.
       GET_EDGE(nr-1);
-      // printit_obbox_dbl_range(&ab[0],"ab0-E3");
-      // printit_obbox_dbl_range(&ab[1],"ab1");
-  
+
       #undef GET_EDGE
       #undef DO_EDGE
       #undef DO_BOUND
 
-      // set bbox bounds based on aabb bounds expanded based on tol
       out->x[0] = dbl_range_expand(ab[0],tol),
       out->x[1] = dbl_range_expand(ab[1],tol);
-//      printit_obbox_dbl_range(&out->x[0],"ab0-expanded");
-//      printit_obbox_dbl_range(&out->x[1],"ab1-expanded");
 
-
-//      printit_obbox_dbl_range(&tb[0],"tb0-final");
-//      printit_obbox_dbl_range(&tb[1],"tb1-final");
-  
       {
-        // av0 and av1 are the ref space mid-points of the reference frame bounding box
         const double av0=(tb[0].min+tb[0].max)/2, av1=(tb[1].min+tb[1].max)/2;
-        // Calculate OBBOX center in physical space
         out->c0[0] = x0[0] + J[0]*av0 + J[1]*av1;
         out->c0[1] = x0[1] + J[2]*av0 + J[3]*av1;
       }
       {
-        // Expand ref space bounding box based on tol
         const double di0 = 2/((1+tol)*(tb[0].max-tb[0].min)),
                      di1 = 2/((1+tol)*(tb[1].max-tb[1].min));
-        // The same factor of expansion is applied to the Jacobian matrix
-        // to get the OBBOX transformation matrix.
         out->A[0]=di0*Ji[0], out->A[1]=di0*Ji[1];
         out->A[2]=di1*Ji[2], out->A[3]=di1*Ji[3];
       }
-
-//      printit(out->c0, 2, "center");
-//      printit(out->A, 4, "def Jac");
     }
   }
-  
-  free(data);  
+  free(data);
 }
 
 void obbox_calc_3(struct obbox_3 *out,
@@ -343,28 +252,28 @@ void obbox_calc_3(struct obbox_3 *out,
            *const lob_bnd_data_s = data+2*(nr+ns+nt)+lbsize0,
            *const lob_bnd_data_t = data+2*(nr+ns+nt)+lbsize0+lbsize1;
     double *const work = data+2*(nr+ns+nt)+lbsize0+lbsize1+lbsize2;
-    
+
     #define SETUP_DIR(r) do { \
       lagrange_fun *const lag = gll_lag_setup(work, n##r); \
       lag(I0##r, work,n##r,1, 0); \
       lob_bnd_setup(lob_bnd_data_##r, n##r,m##r); \
     } while(0)
-    
+
     SETUP_DIR(r); SETUP_DIR(s); SETUP_DIR(t);
-    
+
     #undef SETUP_DIR
-    
+
     for(;nel;--nel,x+=nrst,y+=nrst,z+=nrst,++out) {
       double x0[3], J[9], Ji[9];
       struct dbl_range ab[3], tb[3];
-  
+
       /* double work[2*nrs+3*nr] */
       #define EVAL_AT_0(d,x) \
         x0[d] = tensor_ig3(J+3*d, I0r,nr, I0s,ns, I0t,nt, x, work)
-      EVAL_AT_0(0,x); EVAL_AT_0(1,y); EVAL_AT_0(2,z);                          
+      EVAL_AT_0(0,x); EVAL_AT_0(1,y); EVAL_AT_0(2,z);
       mat_inv_3(Ji, J);
       #undef EVAL_AT_0
- 
+
       /* double work[2*m##r*(n##s+m##s+1)] */
       #define DO_BOUND(bnd,merge,r,s,x,work) do { \
         struct dbl_range b = \
@@ -394,12 +303,12 @@ void obbox_calc_3(struct obbox_3 *out,
         copy_strided(work+2*n##r*n##s, z+off,n1,n2,n3); \
         DO_FACE(1,r,s,work,work+n##r*n##s,work+2*n##r*n##s,work+3*n##r*n##s); \
       } while(0)
-  
+
       GET_FACE(r,t,0     ,nr,ns,nt);
       GET_FACE(r,t,nrs-nr,nr,ns,nt);
       GET_FACE(s,t,0     , 1,nr,ns*nt);
       GET_FACE(s,t,nr-1  , 1,nr,ns*nt);
-      
+
       #undef GET_FACE
       #undef DO_FACE
       #undef DO_BOUND
@@ -407,7 +316,7 @@ void obbox_calc_3(struct obbox_3 *out,
       out->x[0] = dbl_range_expand(ab[0],tol),
       out->x[1] = dbl_range_expand(ab[1],tol);
       out->x[2] = dbl_range_expand(ab[2],tol);
-  
+
       {
         const double av0 = (tb[0].min+tb[0].max)/2,
                      av1 = (tb[1].min+tb[1].max)/2,
@@ -427,52 +336,28 @@ void obbox_calc_3(struct obbox_3 *out,
 
     }
   }
-  
-  free(data);
-}
 
-void printit_coords( const double *x, const double *y, const double *z,
-                      const int npts,   const int dim,  char *myString )
-{
-  printf("Printing coords %s\n",myString);
-  for (int i = 0; i < npts; i++)
-  {
-    if (dim==2) printf("(%g,%g) ",x[i],y[i]);
-    if (dim==3) printf("(%g,%g,%g) ",x[i],y[i],z[i]);
-    if (i%6==0 && i!=0) printf("\n");
-  }
-  printf("\n");
+  free(data);
 }
 
 /* Calculates the diagonal length of the bounding box and expands its bounds by
  * 0.5*len*tol at both its min and max values.
  * Returns the length of the diagonal (could be used for expanding obboxes).
  */
-double dblsurf_range_expand_2(struct dbl_range *m, struct dbl_range b[2], double tol, double len)
+double dbl_range_diag_expand_2(struct dbl_range *m, struct dbl_range b[3], double tol)
 {
-  // amount of expansion in each physical dimension beyond current obbox bounds
-  if (len<1e-12) { // FIXME: 1e-12 is arbitrary
-    double l[2] = { b[0].max-b[0].min, b[1].max-b[1].min };
-    len = sqrt( l[0]*l[0] + l[1]*l[1] )*0.5*tol;
-  }
+  double l[2] = { b[0].max-b[0].min, b[1].max-b[1].min };
+  double len = sqrt(l[0]*l[0] + l[1]*l[1])*0.5*tol;
   for (int i=0; i<2; i++) {
     m[i].min = b[i].min - len;
     m[i].max = b[i].max + len;
   }
   return len;
 }
-
-/* Calculates the diagonal length of the bounding box and expands its bounds by
- * 0.5*len*tol at both its min and max values.
- * Returns the length of the diagonal (could be used for expanding obboxes).
- */
-double dblsurf_range_expand_3(struct dbl_range *m, struct dbl_range b[3], double tol, double len)
+double dbl_range_diag_expand_3(struct dbl_range *m, struct dbl_range b[3], double tol)
 {
-  // amount of expansion in each physical dimension beyond current obbox bounds
-  if (len<1e-12) { // FIXME: 1e-12 is arbitrary
-    double l[3] = { b[0].max-b[0].min, b[1].max-b[1].min, b[2].max-b[2].min };
-    len = sqrt( l[0]*l[0] + l[1]*l[1] + l[2]*l[2] )*0.5*tol;
-  }
+  double l[3] = { b[0].max-b[0].min, b[1].max-b[1].min, b[2].max-b[2].min };
+  double len = sqrt(l[0]*l[0] + l[1]*l[1] + l[2]*l[2])*0.5*tol;
   for (int i=0; i<3; i++) {
     m[i].min = b[i].min - len;
     m[i].max = b[i].max + len;
@@ -506,45 +391,30 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
            *const lob_bnd_data_r = data + 2*nr,        // lbsize0 doubles
            *const work = data + 2*nr + lbsize0;        // wsize doubles
 
-    /*
-    All the calculation in SETUP_DIR is done for the reference space. So the
-    question arises: why r and s are treated separately?  This is because James
-    assumed that the r and s directions could have different number of nodes.
-    For us, that is not the case. So, we can just do this calculation in one
-    direction and use everywhere.
-    1. lag would store a pointer to a function of type lagrange_fun, pointing to
-       the correct function to evaluate the lagrange polynomials on nr GLL nodes
-    2. gll_lag_setup returns correct lag_coeff function and stores lag_coeffs
-       (based on ref coords) in work for evaluating the lagrange polynomials.
-    3. the coefficients in work are utilized to evaluate the lagrange polynomials and 
-       their 1st derivatives at x=0 (or r=0) in I0##r.
-    4. lob_bnd_setup assigns to lob_bnd_data_##r, which is used to compute bounds
-    */
     #define SETUP_DIR(r) do { \
       lagrange_fun *const lag = gll_lag_setup(work, n##r); \
       lag(I0##r, work,n##r,1, 0); \
       lob_bnd_setup(lob_bnd_data_##r, n##r,m##r); \
     } while(0)
-    
+
     SETUP_DIR(r);
     #undef SETUP_DIR
 
     // Loop over all elements; note the decrementing nel
     uint nelorig = nel;
     for( ; nel; --nel,x+=nr,y+=nr,++out) {
-      double x0[2], A[4];            //x0: element center; A: the transformation from phy. to ref. space
-      struct dbl_range ab[2], tb[2]; //ab: aabb bounds; tb: transformed aabb bounds
+      double x0[2], A[4];
+      struct dbl_range ab[2], tb[2];
 
-      x0[0] = tensor_ig1(A  ,I0r,nr,x); // A[0] = dx/dr, x0[0] = x(r=0), i.e., element center
-      x0[1] = tensor_ig1(A+1,I0r,nr,y); // A[1] = dy/dr, x0[1] = y(r=0), i.e., element center
+      x0[0] = tensor_ig1(A  ,I0r,nr,x);
+      // A[0] = dx/dr, x0[0] = x(r=0), i.e., element center
+      x0[1] = tensor_ig1(A+1,I0r,nr,y);
+      // A[1] = dy/dr, x0[1] = y(r=0), i.e., element center
       A[2] = sqrt( A[0]*A[0] + A[1]*A[1] );
       A[0] = A[0]/A[2];
       A[1] = A[1]/A[2];
       A[2] = -A[1];
       A[3] =  A[0];
-
-      // printit(x0, 2, "center x0");
-      // printit(A,  4, "Transformation matrix A");
       /* At this stage, A has the rotation matrix that captures the rotation the
        * physical nodes require to align the tangent at element center with the
        * x-axis.
@@ -557,15 +427,7 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
         bnd = lob_bnd_1(lob_bnd_data_##r,n##r,m##r, x, work); \
       } while(0)
 
-      /* double work[2*n##r + 2*m##r]
-       * Find the bounds for a edge, for all its physical dimensions.
-       * We will explain every line of the macro:
-       * lines 1,2: Bound x and y physical dimensions separately and store in
-       *            ab[0] and ab[1] respectively.
-       * lines 3  : Transform the gll nodes according to A and store in work.
-       * lines 4,5: Bound the transformed gll nodes and store the bounds of 
-       *            the transformation in tb[0] and tb[1].
-       */
+      /* double work[2*n##r + 2*m##r] */
       #define DO_EDGE(r,x,y,work) do { \
         DO_BOUND(ab[0],r,x,work); \
         DO_BOUND(ab[1],r,y,work); \
@@ -573,38 +435,34 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
         DO_BOUND(tb[0],r,(work),(work)+2*n##r); \
         DO_BOUND(tb[1],r,(work)+n##r,(work)+2*n##r); \
       } while(0)
-      // the first edge for nodes in lexicographic order
       DO_EDGE(r,x,y,work);
       #undef DO_EDGE
       #undef DO_BOUND
 
-      double tol_len;
-      tol_len = dblsurf_range_expand_2(out->x, ab, tol, 0.0);
+      double aabb_diag_len = dbl_range_diag_expand_2(out->x, ab, tol);
 
-      // av0 and av1 are the rotated AABB center coordinates and are hence
-      // the offset of the OBB center with respect to the element center
-      // in the rotated space.
       const double av0 = (tb[0].min+tb[0].max)/2,
                    av1 = (tb[1].min+tb[1].max)/2;
-      // We now "un"rotate av0 and av1 to get the OBB center in the original
-      // physical space.
       const double dx0 =  A[0]*av0 - A[1]*av1,
                    dx1 = -A[2]*av0 + A[3]*av1;
-      // Calculate the true untranslated OBBOX center in physical space
       out->c0[0] = x0[0] + dx0;
       out->c0[1] = x0[1] + dx1;
 
-      tol_len = dblsurf_range_expand_2(tb, tb, tol, 0.0);
-      // printit_obbox_dbl_range(&tb[0],"tb0-expanded");
-      // printit_obbox_dbl_range(&tb[1],"tb1-expanded");
+      // Expand by aabb_diag_len only if the element is possibly planar
+      if (fabs(tb[1].max-tb[1].min) < 1e-10*aabb_diag_len)
+      {
+        tb[1].min -= aabb_diag_len;
+        tb[1].max += aabb_diag_len;
+      }
+      else
+      {
+        tb[1] = dbl_range_expand(tb[1],tol);
+      }
+      tb[0] = dbl_range_expand(tb[0],tol);
       const double di0 = 2/(tb[0].max-tb[0].min),
                    di1 = 2/(tb[1].max-tb[1].min);
-      // The scaling matrix is premultiplied to the rotation matrix to obtain
-      // the final transformation needed to move a location relative to the OBB
-      // center to a space in [-1,1]^2.
       out->A[0]=di0*A[0], out->A[1]=di0*A[1];
       out->A[2]=di1*A[2], out->A[3]=di1*A[3];
-      // printit(out->c0, 2, "center out->c0");
     }
   }
   free(data);
@@ -645,7 +503,7 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
      * James assumed that the r and s directions could have different number of
      * nodes. For us, that is not the case. So, we can just do this calculation
      * in one direction and use everywhere.
-     * 1. lag would store a pointer to a function of type lagrange_fun, 
+     * 1. lag would store a pointer to a function of type lagrange_fun,
      *    pointing to the correct function to evaluate the lagrange polynomials
      *    on nr GLL nodes.
      * 2. gll_lag_setup returns correct lag_coeff function and stores
@@ -664,14 +522,14 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
     SETUP_DIR(r);
     SETUP_DIR(s);
     #undef SETUP_DIR
-    
+
     uint nelorig = nel;
     // Loop over all elements; note the decrementing nel
     for(; nel; --nel,x+=nrs,y+=nrs,z+=nrs,++out) {
       struct dbl_range ab[3];
       struct dbl_range tb[3];
       double x0[3], tv[9], A[9];
- 
+
       /* double work[2*nr]
        * Find the center of the element (r=0 ref. coord.) in physical space
        * and store in x0.
@@ -698,51 +556,37 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       tv[6] = tv[6]/nmag;
       tv[7] = tv[7]/nmag;
       tv[8] = tv[8]/nmag;
-      // At this point, we have tv = [tangent_r tangent_s normal]^T, only 
-      // the normal vector is normalized.
 
-      // if normal vector is not already parallel to xz plane
-      if (fabs(tv[7])>1e-12) {
-        // Calculate the magnitude of the projection of the normal vector on the
-        // yz plane.
-        const double magyz = sqrt( tv[7]*tv[7] + tv[8]*tv[8] );
-        // Let theta be the anticlockwise angle FROM the y-axis TO the
-        // yz-projection of the normal vector. Then,
-        // cos(theta) = tv[7]/magyz & sin(theta) = tv[8]/magyz.
-        // Then the anticlockwise rotation about x-axis, say theta_x, needed to
-        // bring the normal vector parallel to the xz plane is (pi/2 - theta).
-        // cos(theta_x) = cos(pi/2 - theta) = sin(theta)
-        // sin(theta_x) = sin(pi/2 - theta) = cos(theta)
-        const double cthetax = tv[8]/magyz,
-                     sthetax = tv[7]/magyz;
 
-        // Let the anticlockwise angle from the z-axis to the rotated normal
-        // vector be theta. Also, its z-component would be magyz, i.e., the 
-        // yz-projection rotated parallel to xz-plane. Then,
-        // cos(theta) = magyz & sin(theta) = tv[6].
-        // Then the rotation about y-axis required to get the normal vector
-        // to align with the z-axis is theta_y := -theta. Hence:
-        // cos(theta_y) = cos(-theta) = cos(theta)
-        // sin(theta_y) = sin(-theta) = -sin(theta)
-        const double cthetay = magyz,
-                     sthetay = -tv[6];
+      // // Rodrigues formula to compute the rotation matrix
+      // double axis[3]; // cross product between normal vector and z-axis
+      const double nmag2 = sqrt(tv[6]*tv[6] + tv[7]*tv[7]);
+      tv[7] = tv[7]/nmag2;
+      tv[6] = tv[6]/nmag2;
+      #define kx tv[7]
+      #define ky -tv[6]
+      #define kz 0.0
 
-        // The rotation matrix that rotates the normal vector to the z-axis.
-        // Product of the two rotation matrices due to rotation about x and y.
-        A[0] =  cthetay, A[1] = sthetax*sthetay, A[2] = cthetax*sthetay;
-        A[3] =  0,       A[4] = cthetax,         A[5] = -sthetax;
-        A[6] = -sthetay, A[7] = sthetax*cthetay, A[8] = cthetax*cthetay;
+      double ct = tv[8];
+      double st = 1.0 - ct*ct;
+      if (st > 0.0)
+      {
+        st = sqrt(st);
       }
-      // if normal vector is already parallel to xz plane, no rotation about
-      // x-axis is needed.
-      else {
-        const double cthetay = tv[8],   // cos(theta_y)
-                     sthetay = -tv[6];  // sin(theta_y)
-        // The rotation matrix that rotates the normal vector to the z-axis
-        A[0] =  cthetay, A[1] = 0, A[2] = sthetay;
-        A[3] =  0,       A[4] = 1, A[5] = 0;
-        A[6] = -sthetay, A[7] = 0, A[8] = cthetay;
-      }
+
+      // row-major
+      A[0] = 1.0 + st*0.0 + (1.0-ct)*(-ky*ky-kz*kz);
+      A[1] = 0.0 + st*(0.0) + (1.0-ct)*(kx*ky);
+      A[2] = 0.0 + st*(ky) + (1.0-ct)*(kx*kz);
+
+      A[3] = 0.0 + st*(0.0) + (1.0-ct)*(kx*ky);
+      A[4] = 1.0 + st*(0.0) + (1.0-ct)*(-kx*kx-kz*kz);
+      A[5] = 0.0 + st*(-kx) + (1.0-ct)*(ky*kz);
+
+      A[6] = 0.0 + st*(-ky) + (1.0-ct)*(kx*kz);
+      A[7] = 0.0 + st*(kx) + (1.0-ct)*(ky*kz);
+      A[8] = 1.0 + st*(0.0) + (1.0-ct)*(-kx*kx-ky*ky);
+
 
       /* At this stage, the normal vector has been aligned with the z-axis. We
        * still need to align the element in xy-plane. The process is as follows:
@@ -763,24 +607,28 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
                         x, work); \
       } while(0)
 
-      // Obtain the axis aligned bounds
       DO_BOUND(ab[0],r,s,x,work);
       DO_BOUND(ab[1],r,s,y,work);
       DO_BOUND(ab[2],r,s,z,work);
-      // Expand the AA-bounds based on the tol, and save the expansion length 
-      // in tol_len.
-      double tol_len = dblsurf_range_expand_3(out->x, ab, tol, 0.0);
+      // expand bounding box based on (tol*diagonal_length) in each direction
+      // to avoid 0 extent in 1 direction.
+      double aabb_diag_len = dbl_range_diag_expand_3(out->x, ab, tol);
 
       double xtfm[3*nrs]; // xtfm[0]:x, xtfm[nrs]:y, xtfm[2*nrs]:z
-      // Obtain the GLL nodes, when translated to (0,0) and rotated by A. The
-      // element center would be at (0,0).
       bbox_3_tfm(xtfm, x0,A, x,y,z,nrs);
       // The rotated z-coords are used to calculate z-bounds.
       DO_BOUND(tb[2],r,s,xtfm+2*nrs,work);
-      // expand in z-direction by AABB expansion length tol_len
-      // FIXME: a better choice for expansion length?
-      tb[2].min -= tol_len;
-      tb[2].max += tol_len;
+      // OBB - expand in z-direction by aabb_diag_len only if the rotate
+      // element is possibly planar.
+      if (fabs(tb[2].max-tb[2].min) < 1e-10*aabb_diag_len)
+      {
+        tb[2].min -= aabb_diag_len;
+        tb[2].max += aabb_diag_len;
+      }
+      else
+      {
+        tb[2] = dbl_range_expand(tb[2],tol);
+      }
 
       // Also apply A to the tangent vectors, which allows us to calculate the
       // Jacobian matrix at the rotated element center. NOTE that the z
@@ -806,16 +654,17 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       DO_BOUND(tb[0],r,s,xtfm    ,work);
       DO_BOUND(tb[1],r,s,xtfm+nrs,work);
       // Expand the bounds based on the tol
-      tol_len = dblsurf_range_expand_2(tb,tb,tol,0.0);
+      tb[0] = dbl_range_expand(tb[0],tol);
+      tb[1] = dbl_range_expand(tb[1],tol);
       #undef DO_BOUND
 
-      /* We now have a BB whose bounds represent bounds of a OBB around the 
+      /* We now have a BB whose bounds represent bounds of a OBB around the
        * original element.
-       * 
+       *
        * We calculate the center of the OBB in physical space by calculating the
        * center of this BB, which is the same as the displacement needed to move
        * from the element center in the transformed space to the BB center. This
-       * displacement is then untransformed by applying (Ji.A)^-1 to it, and 
+       * displacement is then untransformed by applying (Ji.A)^-1 to it, and
        * added to known physical element center.
        *
        * This BB does not necessarily have known fixed size like [-1,1].
@@ -823,7 +672,7 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
        * This is the total transformation needed to move a physical location
        * that is inside the physical OBB to a location within [-1,1]^3.
        * Any transformed point not in [-1,1]^3 is outside the OBB.
-       * 
+       *
        * It must be noted: this transformation matrix is only applied to points
        * that have been translated by the physical OBB center.
        */
@@ -837,7 +686,7 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
         const double Jav0 = J[0]*av0 + J[1]*av1,
                      Jav1 = J[2]*av0 + J[3]*av1;
         // The physical displacement needed to move from the element center to
-        // the OBB center is calculated by "un"rotating {Jav0,Jav1,av2} by 
+        // the OBB center is calculated by "un"rotating {Jav0,Jav1,av2} by
         // applying inverse of A.
         // The physical untransformed OBB center can then be obtained.
         out->c0[0] = x0[0] + A[0]*Jav0 + A[3]*Jav1 + A[6]*av2,

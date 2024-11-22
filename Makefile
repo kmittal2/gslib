@@ -122,7 +122,7 @@ tests: $(TESTS)
 clean: ; @$(RM) config.h $(SRCDIR)/*.o $(SRCDIR)/*.s $(SRCDIR)/*.a $(TESTDIR)/*.o $(FTESTDIR)/*.o $(TESTS)
 
 $(TESTS): % : %.c | lib install
-	$(CC) $(CFLAGS) -I$(INSTALL_ROOT)/include $< -o $@ -L$(INSTALL_ROOT)/lib -l$(LIBNAME) -lm $(LDFLAGS) 
+	$(CC) $(CFLAGS) -I$(INSTALL_ROOT)/include $< -o $@ -L$(INSTALL_ROOT)/lib -l$(LIBNAME) -lm $(LDFLAGS)
 
 $(FTESTS): % : %.o | lib install
 	$(FCCMD) $^ -o $@ -L$(SRCDIR) -l$(LIBNAME)

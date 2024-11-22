@@ -17,12 +17,12 @@
 #include <string.h>
 #endif
 
-/* 
+/*
    All memory management goes through the wrappers defined in this
    header. Diagnostics can be turned on with
      -DPRINT_MALLOCS=1
    Then all memory management operations will be printed to stdout.
-   
+
    Most memory management occurs through use of the "array" type,
    defined below, which defines a generic dynamically-sized array
    that grows in bursts. The "buffer" type is a "char" array and

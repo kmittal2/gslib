@@ -66,45 +66,6 @@
      hash_free(&data);
 
   --------------------------------------------------------------------------*/
-
-#define printit_obbox_dbl_range_fptloc   TOKEN_PASTE(printit_obbox_dbl_range_fptloc ,D)
-#define printit_fptloc   TOKEN_PASTE(printit_fptloc ,D)
-#define printit_int_fptloc   TOKEN_PASTE(printit_int_fptloc ,D)
-
-void printit_fptloc(const double *p, const int size, char *myString)
-{
-    printf("Printing in fpt loc imp %s\n",myString);
-    for (int i = 0; i < size;)
-    {
-        for (int j = 0; j < 8 && i < size; j++)
-        {
-            printf("%g ",p[i]);
-            i++;
-        }
-        printf("\n");
-    }
-}
-
-void printit_int_fptloc(const uint *p, const int size, char *myString)
-{
-    printf("Printing in fpt loc imp %s\n",myString);
-    for (int i = 0; i < size;)
-    {
-        for (int j = 0; j < 8 && i < size; j++)
-        {
-            printf("%u ",p[i]);
-            i++;
-        }
-        printf("\n");
-    }
-}
-
-void printit_obbox_dbl_range_fptloc(const struct dbl_range *p, char *myString)
-{
-    printf("Printing dbl_range in fpt loc imp %s\n",myString);
-    printf("%g %g\n",p->min,p->max);
-}
-
 struct hash_data {
   uint hash_n;
   struct dbl_range bnd[D];
@@ -134,16 +95,16 @@ static void hash_setfac(struct hash_data *p, const uint n)
  * AABB. Equal to the number of hash cells that need to be "traversed" from the
  * hash mesh's lower bound to reach the lower and upper bounds of the obbox or
  * the hash mesh itself.
- * 
+ *
  *   hashmin      obbox          hashmax
- *      |        |<--->|            |  
- *      |-|-|-|-|-|-|-|-|-|-|-|-|-|-|  
+ *      |        |<--->|            |
+ *      |-|-|-|-|-|-|-|-|-|-|-|-|-|-|
  *      |<----->|       |           |
  *      | nlow=4        |           |
  *      |<------------->|           |
  *      |    nhigh=8                |
- * 
- * If the obbox's lower bound is less than the hash mesh's lower bound, then 
+ *
+ * If the obbox's lower bound is less than the hash mesh's lower bound, then
  * nlow=0. If the obbox's upper bound is greater than the hash mesh's upper
  * bound, then nhigh=n.
  */
@@ -160,34 +121,27 @@ static struct uint_range hash_range(const struct hash_data *p, unsigned d,
 }
 
 /* Total number of hash cells that would be contributed to by all AABBs. Can
- * be greater than hash mesh cell count due to overlapping per-AABB hash 
+ * be greater than hash mesh cell count due to overlapping per-AABB hash
  * bounds.
  */
 static uint hash_count(struct hash_data *p, const struct obbox *const obb,
                        const uint nel, const uint n)
 {
   uint i,count=0;
-  hash_setfac(p,n);  // fac. required for hash_range
-//  printf("%u %u - Get hash count \n",nel,n);
+  hash_setfac(p,n);
   for(i=0;i<nel;++i) {
     struct uint_range ir; uint ci; unsigned d;
-    // for AABB of element i, get the number of hash cells contributed in each
-    // dimension. Total hash cell count would be the product of per-dimension
-    // hash cell counts.
     ir=hash_range(p,0,obb[i].x[0]); ci  = ir.max-ir.min;
-    // printf("%u %u %u - Get hash count \n",i,0,ir.max-ir.min);
     for(d=1;d<D;++d) {
       ir=hash_range(p,d,obb[i].x[d]), ci *= ir.max-ir.min;
-      // printf("%u %u %u - Get hash count d \n",i,d,ir.max-ir.min);
     }
     count+=ci;
   }
-//  printf("%u - Total count\n",count);
   return count;
 }
 
 /* Array size needed to store the complete hash cells to element map.  Hash cell
- * references would be repeated for multople obbox contributions.  Hence a cell
+ * references would be repeated for multiple obbox contributions.  Hence a cell
  * is only associated with one element in the offset array, and hence is bigger
  * than true count of hash cells.
  */
@@ -203,7 +157,7 @@ uint hash_opt_size(struct hash_data *p,
     size = nmd+1+hash_count(p,obb,nel,nm);
     if(size<=max_size) nl=nm,size_low=size; else nu=nm;
   }
-  hash_setfac(p,nl);  // hash->n is also set here
+  hash_setfac(p,nl);
   return size_low;
 }
 
@@ -216,22 +170,17 @@ static void hash_bb(struct hash_data *p,
   uint el; unsigned d;
   struct dbl_range bnd[D];
   if(nel) {
-    for(d=0;d<D;++d) bnd[d]=obb[0].x[d];  // initialize bnd with first element obbox bounds
-//    printit_obbox_dbl_range_fptloc(&bnd[0], "initial hash bb x");
-//    printit_obbox_dbl_range_fptloc(&bnd[1], "initial hash bb y");
+    for(d=0;d<D;++d) bnd[d]=obb[0].x[d];
     for(el=1;el<nel;++el) {
       for(d=0;d<D;++d) {
         bnd[d]=dbl_range_merge(bnd[d],obb[el].x[d]);
       }
-//      printit_obbox_dbl_range_fptloc(&bnd[0], "evolving hash bb x");
-//      printit_obbox_dbl_range_fptloc(&bnd[1], "evolving hash bb y");
     }
-    for(d=0;d<D;++d) p->bnd[d]=bnd[d];  // the final all-encompassing bounds for all elements
+    for(d=0;d<D;++d) p->bnd[d]=bnd[d];
   }
   else {
     for(d=0;d<D;++d) p->bnd[d].max=p->bnd[d].min=0;
   }
-//  printf("%f %f %f %f %f %f - k10-hashbounds-\n",p->bnd[0].min,p->bnd[0].max,p->bnd[1].min,p->bnd[1].max,p->bnd[2].min,p->bnd[2].max);
 }
 
 static void hash_build(struct hash_data *p,
@@ -239,14 +188,12 @@ static void hash_build(struct hash_data *p,
                        const uint max_size)
 {
   uint i,el,size,hn,hnd,sum,max, *count;
-  hash_bb(p,obb,nel);                          // Get min-max spatial bounds for hash mesh
-  size = hash_opt_size(p,obb,nel,max_size);    // (hnd+1) + SUM (per obbox (i.e. element) hash cell count)
-  p->offset = tmalloc(uint,size);              // offset array to map hash cells to elements
-  hn = p->hash_n;                              // number of hash cells in each dimension
-  hnd = hn*hn; WHEN_3D(hnd*=hn);               // total number of hash cells
+  hash_bb(p,obb,nel);
+  size = hash_opt_size(p,obb,nel,max_size);
+  p->offset = tmalloc(uint,size);
+  hn = p->hash_n;
+  hnd = hn*hn; WHEN_3D(hnd*=hn);
   count = tcalloc(uint,hnd);
-  // count the number of obboxes contributing to each hash cell and increment
-  // the corresponding index.
   for(el=0;el<nel;++el) {
     unsigned d; struct uint_range ir[D];
     for(d=0;d<D;++d) ir[d]=hash_range(p,d,obb[el].x[d]);
@@ -259,23 +206,17 @@ static void hash_build(struct hash_data *p,
     FOR_LOOP();
     #undef FOR_LOOP
   }
-  // Total count of obbox contributions for all hash cells prior to (i+1)th
-  // cell is stored in offset[i+1] temporarily. used in next FOR_LOOP.
   sum=hnd+1, max=count[0];
   p->offset[0]=sum;
-//  printf("%u %u k10-setup offset\n",sum,max);
   for(i=0;i<hnd;++i) {
     max = count[i]>max?count[i]:max;
     sum += count[i];
     p->offset[i+1] = sum;
-//    printf("%u %u %u %u k10-computing offset\n",i,p->offset[i+1],sum,max);
   }
-  p->max = max;  // maximum number of obboxes that may contribute to a single hash cell
+  p->max = max;
   for(el=0;el<nel;++el) {
     unsigned d; struct uint_range ir[D];
     for(d=0;d<D;++d) ir[d]=hash_range(p,d,obb[el].x[d]);
-    // loop over all hash cells that obbox of element el contributes to. The
-    // offset array maps a hash cell to a element.
     #define FOR_LOOP() do { uint i,j; WHEN_3D(uint k;) \
       WHEN_3D(for(k=ir[2].min;k<ir[2].max;++k)) \
               for(j=ir[1].min;j<ir[1].max;++j) \
@@ -288,10 +229,6 @@ static void hash_build(struct hash_data *p,
     FOR_LOOP();
     #undef FOR_LOOP
   }
-//  printit_int_fptloc(p->offset,size,"p->offset");
-//  printit_obbox_dbl_range_fptloc(&p->bnd[0], "final hash bb x");
-//  printit_obbox_dbl_range_fptloc(&p->bnd[1], "final hash bb y");
-//  printf("%g %g %u %u final fac and max and hash_n \n",p->fac[0],p->fac[1],p->max,p->hash_n);
   free(count);
 }
 
@@ -356,11 +293,11 @@ void findptssurfms_local_setup( struct findpts_local_data *const fd,
     fd->elx[d] = elx[d];
   }
   fd->nsid = nsid;
-  fd->obb = tmalloc(struct obbox,nel);  // obbox struct stores bbox info for each element
+  fd->obb = tmalloc(struct obbox,nel);
   obboxsurf_calc(fd->obb,elx,n,nel,m,bbox_tol);
   hash_build(&fd->hd,fd->obb,nel,max_hash_size);
 
-  // findpts_el_setup(&fd->fed,n,npt_max);
+  /* skip findpts_el_setup(&fd->fed,n,npt_max); */
   fd->tol = newt_tol;
   fd->ims = ims;
   if (fd->ims==1) {
@@ -391,7 +328,7 @@ static void map_points_to_els(
         uint   *const         code_base, const unsigned       code_stride,
   const double *const         x_base[D], const unsigned       x_stride[D],
   const uint   *const   session_id_base, const unsigned session_id_stride,
-  const uint   *const  session_id_match, const uint                   npt, 
+  const uint   *const  session_id_match, const uint                   npt,
   const struct findpts_local_data *const fd, buffer *buf)
 {
   uint index;
@@ -406,7 +343,6 @@ static void map_points_to_els(
     { const uint hi = hash_index(&fd->hd,x);
       const uint       *elp = fd->hd.offset + fd->hd.offset[hi  ],
                  *const ele = fd->hd.offset + fd->hd.offset[hi+1];
-//      printf("%u %u %u - k10info\n",hi,*elp,*ele);
       *code = CODE_NOT_FOUND;
       for(; elp!=ele; ++elp) {
         const uint el = *elp;
@@ -445,7 +381,7 @@ void findptsms_local(
   const uint   *const  session_id_base, const unsigned session_id_stride,
         double *const       disti_base, const unsigned      disti_stride,
         uint   *const       elsid_base, const unsigned      elsid_stride,
-  const uint   *const session_id_match, const uint                   npt, 
+  const uint   *const session_id_match, const uint                   npt,
    struct findpts_local_data *const fd,  buffer *buf)
 {
   struct findpts_el_data *const fed = &fd->fed;
@@ -492,9 +428,9 @@ void findptsms_local(
             double *r = AT(double,r,index);
             uint *eli = AT(uint,el,index);
             uint *elsid = AT(uint,elsid,index);
-            *eli   = el;    
+            *eli   = el;
             *code  = fpt[i].flags==(1u<<(2*D)) ? CODE_INTERNAL : CODE_BORDER;
-            *dist2 = fpt[i].dist2;   
+            *dist2 = fpt[i].dist2;
             *disti = (fd->ims==1) ? fd->distrsti[i] : 0.;
             *elsid = (fd->ims==1) ? fd->nsid[0]     : 0 ;
 	    for(d=0;d<D;++d) r[d]=fpt[i].r[d];
@@ -602,7 +538,7 @@ void findpts_local(
     *sess_match = 0;
     *disti_base = 0;
     *elsid_base = 0;
-    
+
 
     unsigned sess_stride=0;
     unsigned disti_stride=0;

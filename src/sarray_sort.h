@@ -6,9 +6,9 @@
 #endif
 
 /*------------------------------------------------------------------------------
-  
+
   Array of Structs Sort
-  
+
   buffer *buf;
   typedef struct { ... } T;
   T A[n];

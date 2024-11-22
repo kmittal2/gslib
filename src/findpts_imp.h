@@ -44,7 +44,6 @@
 #define findptssurf_setup         TOKEN_PASTE(PREFIXED_NAME(findptssurf_setup_)        ,D)
 #define findptssurfms_setup       TOKEN_PASTE(PREFIXED_NAME(findptssurfms_setup_)      ,D)
 #define findptssurfms_local_setup TOKEN_PASTE(PREFIXED_NAME(findptssurfms_local_setup_),D)
-// #define setupsurfms_aux          TOKEN_PASTE(setupsurfms_aux_                        ,D)
 
 #define printit_int_fpt   TOKEN_PASTE(printit_int_fpt ,D)
 
@@ -97,7 +96,7 @@ static void hash_bb(struct hash_data *p, const struct local_hash_data *lp,
 
   ghs = hash_size; comm_allreduce(comm,gs_double,gs_add,&ghs,1,buf);
   hash_setfac(p,lceil(pow(ghs,1./D)));
-  
+
   #ifdef DIAGNOSTICS
   if(comm->id==0) {
     printf("global bounding box (%g^%u):\n",(double)p->hash_n,D);
@@ -211,7 +210,6 @@ static void hash_build(struct hash_data *const p,
   free(local_mask);
   sarray_transfer(struct proc_index,&hash,proc,1,cr);
   table_from_hash(p,&hash,cr->comm.np,&cr->data);
-//  printf("%u %u-k10finalsize\n",hash_size,p->hash_n);
   array_free(&hash);
 }
 
@@ -231,21 +229,6 @@ struct findpts_data {
   uint   fevsetup;
 };
 
-void printit_int_fpt(const uint *p, const int size, char *myString)
-{
-    printf("Printing in fpt loc imp %s\n",myString);
-    for (int i = 0; i < size;)
-    {
-        for (int j = 0; j < 8 && i < size; j++)
-        {
-            printf("%u ",p[i]);
-            i++;
-        }
-        printf("\n");
-    }
-}
-
-
 static void setupms_aux(
   struct findpts_data *const fd,
   const double *const elx[D],
@@ -261,21 +244,6 @@ static void setupms_aux(
   hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,
              global_hash_size,&fd->cr);
   fd->fevsetup = 0;
-//  {
-//      const uint np = fd->cr.comm.np, id=fd->cr.comm.id;
-//      const uint ncells = fd->hash.hash_n*fd->hash.hash_n;
-//      const uint nents = ncells/np;
-//      const uint size = fd->hash.offset[nents];
-//      for (int i = 0; i < np; i++)
-//      {
-//          if (i == id)
-//          {
-//              printf("%u %u - printing from rank\n",id,size);
-//              printit_int_fpt(fd->hash.offset,size,"fd->has from rank");
-//          }
-//          MPI_Barrier(MPI_COMM_WORLD);
-//      }
-//  }
 }
 
 struct findpts_data *findptsms_setup(
@@ -284,7 +252,7 @@ struct findpts_data *findptsms_setup(
   const unsigned n[D], const uint nel,
   const unsigned m[D], const double bbox_tol,
   const uint local_hash_size, const uint global_hash_size,
-  const unsigned npt_max, const double newt_tol, 
+  const unsigned npt_max, const double newt_tol,
   const uint *const nsid, const double *const distfint)
 {
   uint ims=1;
@@ -304,16 +272,17 @@ struct findpts_data *findptssurfms_setup( const struct comm *const comm,
                                         const uint local_hash_size,
                                         const uint global_hash_size,
                                         const unsigned npt_max,
-                                        const double newt_tol, 
+                                        const double newt_tol,
                                         const uint *const nsid,
                                         const double *const distfint )
 {
   uint ims=1;
   struct findpts_data *const fd = tmalloc(struct findpts_data, 1);
   crystal_init(&fd->cr,comm);
-  findptssurfms_local_setup(&fd->local,elx,nsid,distfint,n,nel,m,bbox_tol,local_hash_size,
-                           npt_max, newt_tol,ims);
-  // hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,global_hash_size,&fd->cr);
+  findptssurfms_local_setup(&fd->local,elx,nsid,distfint,n,nel,m,bbox_tol,local_hash_size, npt_max, newt_tol,ims);
+  /* skip hash_build
+    hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,global_hash_size,&fd->cr);
+  */
   fd->fevsetup = 0;
   return fd;
 }
@@ -494,14 +463,14 @@ void findptsms(        uint   *const        code_base, const unsigned       code
 
       if (index!=oldindex || n==out_pt.n) { /* initialize overall winner for each pt */
         oldindex   = index;
-        asdisti    = -DBL_MAX; 
+        asdisti    = -DBL_MAX;
         oldelsid   = 0;
         istart     = 0;
         ioriginator= 0;
         if (*code!=CODE_NOT_FOUND) {
           ioriginator = 1;
         }
-      } 
+      }
       if (opt->elsid!=oldelsid || istart == 0)    { /* initialize winner for current session */
         istart  = 1;
         oldelsid = opt->elsid;
@@ -648,7 +617,7 @@ void findptsms_eval(
   const double *const    r_base, const unsigned    r_stride,
   const uint npt,
   const double *const in, struct findpts_data *const fd)
-{ 
+{
   if (fd->fevsetup==0) {
     setup_fev_aux(code_base,code_stride,
                   proc_base,proc_stride,
@@ -659,7 +628,7 @@ void findptsms_eval(
   }
   struct array outpt;
   /* evaluate points, send back */
-  { 
+  {
     uint n = fd->savpt.n;
     struct eval_src_pt *opt;
     struct eval_out_pt *opto;
@@ -693,7 +662,7 @@ struct findpts_data *findpts_setup(
   const unsigned m[D], const double bbox_tol,
   const uint local_hash_size, const uint global_hash_size,
   const unsigned npt_max, const double newt_tol)
-{ 
+{
   uint ims=0;
   struct findpts_data *const fd = tmalloc(struct findpts_data, 1);
   fd->fdms.nsid     = 0;
@@ -714,7 +683,7 @@ struct findpts_data *findptssurf_setup( const struct comm *const comm,
                                       const uint global_hash_size,
                                       const unsigned npt_max,
                                       const double newt_tol )
-{ 
+{
   struct findpts_data *const fd = tmalloc(struct findpts_data, 1);
   uint ims         = 0;
   fd->fdms.nsid    = 0;
@@ -830,4 +799,3 @@ void findpts_eval(
 #undef findptssurf_setup
 #undef findptssurfms_setup
 #undef findptssurfms_local_setup
-// #undef setupsurfms_aux

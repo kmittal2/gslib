@@ -31,9 +31,9 @@ struct dbl_range { double min,max; };
 
    The number of points in the constructed piecewise (tri-,bi-)linear bounds
    is a parameter; more points give tighter bounds, and we expect m>n.
-   
+
      unsigned mr = 4*nr, ms = 4*ns, mt = 4*nt;
-   
+
    The necessary setup is accomplished via:
      double *data_r = tmalloc(double, lob_bnd_size(nr,mr));
      double *data_s = tmalloc(double, lob_bnd_size(ns,ms));
@@ -41,7 +41,7 @@ struct dbl_range { double min,max; };
      lob_bnd_setup(data_r, nr,mr);
      lob_bnd_setup(data_s, ns,ms);
      lob_bnd_setup(data_t, nt,mt);
- 
+
    Bounds may then be computed via:
      double work1r[2*mr], work1s[2*ms];
      double work2[2*mr*(ns+ms+1)];
@@ -50,7 +50,7 @@ struct dbl_range { double min,max; };
      double u2[ns][nr];        // 2-d polynomial on zr[] (x) zs[]
      double u3[nt][ns][nr];    // 3-d polynomial on zr[] (x) zs[] (x) zt[]
      struct dbl_range bound;
-     
+
      bound = lob_bnd_1(data_r,nr,mr, ur, work1r); // compute bounds on ur
      bound = lob_bnd_1(data_s,ns,ms, us, work1s); // compute bounds on us
      bound = lob_bnd_2(data_r,nr,mr, data_s,ns,ms,
@@ -66,7 +66,7 @@ struct dbl_range { double min,max; };
      for(j=1;j<m-1;++j) h[j] = cos((m-1-j)*PI/(m-1));
    The functions lob_bnd_d simply call these and return the min and max
    over all nodes.
-    
+
   --------------------------------------------------------------------------*/
 
 #define PI 3.1415926535897932384626433832795028841971693993751058209749445923
@@ -118,27 +118,27 @@ void lob_bnd_setup(double *restrict data, unsigned n, unsigned m)
 
   // why calculate this a second time? obbox.c SETUP_DIR alreadt calculated this.
   lagrange_fun *lag = gll_lag_setup(gll_data,n); // stores lag_coeffs In gll_data
-  
+
   /* set z and Q to Lobatto nodes (for [-1,1]) and weights, respectively */
   lobatto_quad(z,Q,n);
 
 //  printit_lob_bnd(z, n, "GLL nodes");
 //  printit_lob_bnd(Q, n, "GLL weights");
-  
+
   /* Q[2*i], Q[2*i+1] : linear functionals on the GLL nodal basis
    *                    for the zeroth and first Legendre coefficient
-   * The loop evaluates weight/2 and 3*weight*nodalval, and stores them 
+   * The loop evaluates weight/2 and 3*weight*nodalval, and stores them
    * in Q side by side. Hence Q requires 2*n space.
-   * The decrementing loop is useful to store the values in the same array 
+   * The decrementing loop is useful to store the values in the same array
    * as the input array without overwriting data before it is used.
    */
   for(i=n;i;) --i, Q[2*i]=Q[i]/2, Q[2*i+1] = 3*Q[2*i]*z[i];
   /*for(i=0;i<n;++i) Q0[i]=Q0[i]/2, Q1[i] = 3*Q0[i]*z[i];*/
 
   // printit_lob_bnd(Q, 2*n, "linear functions for the zeroth and first Legendre coefficient");
-  
+
   /* h : m Chebyshev nodal positions
-   * For every Lagrange polynomial, the lower and upper bounds are calculated 
+   * For every Lagrange polynomial, the lower and upper bounds are calculated
    * at the m Chebyshev nodes h.
    */
   h[0] = -1, h[m-1] = 1;
@@ -209,7 +209,7 @@ static void lob_bnd_fst( double *restrict b,
   for(i=0;i<n;++i)
     a0 += Q[2*i]*u[i], a1 += Q[2*i+1]*u[i];
 
-  // For jth Chebyshev node, initialize the bounds to a0+a1*h[j] 
+  // For jth Chebyshev node, initialize the bounds to a0+a1*h[j]
   for(j=0;j<m;++j)
     b[2*j+1] = b[2*j+0] = a0 + a1*h[j];
 
@@ -231,7 +231,7 @@ static void lob_bnd_fst( double *restrict b,
   }
 }
 
-/* See section 2.4 in the document for th process of bounding 
+/* See section 2.4 in the document for th process of bounding
  * 1D functions with bounded (instead of known) coefficients (i.e.,
  * bounded nodal values for Lagrange polynomials).
  */
@@ -255,7 +255,7 @@ static void lob_bnd_ext( double *restrict b_,
     for(j=0;j<n;++j) {
       // see Q's evaluation in lob_bnd_setup()
       double t, q0 = Q[2*j], q1 = Q[2*j+1];
-      // For each Chebyshev node, calculate a0 and a1, whose values 
+      // For each Chebyshev node, calculate a0 and a1, whose values
       // will depend linearly on the bounds of the solution function
       // corresponding to jth Lagrange polynomial and ith Chebyshev node.
       for(i=0;i<mr;++i) {
@@ -263,7 +263,7 @@ static void lob_bnd_ext( double *restrict b_,
         br+=2;
       }
     }
-  } 
+  }
 
   {
     // b stores the bounds of the solution function at m Chebyshev nodes
@@ -279,7 +279,7 @@ static void lob_bnd_ext( double *restrict b_,
     const double *restrict br = br_;
     for(j=0;j<n;++j,lbnp+=4*m) {
       double zj = z[j];
-      double *restrict b = b_; 
+      double *restrict b = b_;
       for(i=0;i<mr;++i) {
         double t = a[2*i] + a[2*i+1]*zj;
         double w0 = *br++ - t;
@@ -333,7 +333,7 @@ void lob_bnd_lin_2( double *restrict b,
     double *br_; unsigned i;
     // If we fix the Lagrange Polynomial in s dir., what are the bounds
     // of the solution function for each Lagrange polynomial in r dir.?
-    // br_ is a pointer to the corresponding bounds, and has naturally a 
+    // br_ is a pointer to the corresponding bounds, and has naturally a
     // size of 2*mr, to store the results of the 1D bounding problem
     // corresponding to ith Lagrange polynomial in s dir.
     for(i=0,br_=br; i<ns; ++i,br_+=2*mr,u+=nr)
@@ -384,10 +384,10 @@ static struct dbl_range minmax(const double *restrict b, unsigned m)
 }
 
 /* work holds 2*m doubles
-   lob_bnd_data: 
+   lob_bnd_data:
    n: number of GLL nodes
-   m: number of Chebyshev nodes 
-   u: 1-d polynomial nodal values on the GLL nodes 
+   m: number of Chebyshev nodes
+   u: 1-d polynomial nodal values on the GLL nodes
    work: work array
 */
 struct dbl_range lob_bnd_1(

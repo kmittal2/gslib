@@ -74,7 +74,7 @@ lagrange_fun *lagrange_setup(
 #define EPS   (128*DBL_EPSILON)
 #define PI 3.1415926535897932384626433832795028841971693993751058209749445923
 
-/* 
+/*
   For brevity's sake, some names have been shortened
   Quadrature rules
     Gauss   -> Gauss-Legendre quadrature (open)
@@ -219,7 +219,6 @@ unsigned gll_lag_size(unsigned n)
   return (n<=GLL_LAG_FIX_MAX?1:9)*n;
 }
 
-// Fills data (should be of size n)
 lagrange_fun *gll_lag_setup(double *restrict data, int n)
 {
   double *z, *w, *p;
