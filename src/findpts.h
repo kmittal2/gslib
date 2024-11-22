@@ -1,32 +1,32 @@
-#ifndef FINDPTSMS_H
-#define FINDPTSMS_H
+#ifndef GS_FINDPTSMS_H
+#define GS_FINDPTSMS_H
 
-#if !defined(COMM_H)
+#if !defined(GS_COMM_H)
 #warning "findpts.h" requires "comm.h"
 #endif
 
-#define findptsms_setup_2   PREFIXED_NAME(findptsms_setup_2)
-#define findptsms_free_2    PREFIXED_NAME(findptsms_free_2 )
-#define findptsms_2         PREFIXED_NAME(findptsms_2      )
-#define findptsms_eval_2    PREFIXED_NAME(findptsms_eval_2 )
-#define findptsms_setup_3   PREFIXED_NAME(findptsms_setup_3)
-#define findptsms_free_3    PREFIXED_NAME(findptsms_free_3 )
-#define findptsms_3         PREFIXED_NAME(findptsms_3      )
-#define findptsms_eval_3    PREFIXED_NAME(findptsms_eval_3 )
+#define findptsms_setup_2   GS_PREFIXED_NAME(findptsms_setup_2)
+#define findptsms_free_2    GS_PREFIXED_NAME(findptsms_free_2 )
+#define findptsms_2         GS_PREFIXED_NAME(findptsms_2      )
+#define findptsms_eval_2    GS_PREFIXED_NAME(findptsms_eval_2 )
+#define findptsms_setup_3   GS_PREFIXED_NAME(findptsms_setup_3)
+#define findptsms_free_3    GS_PREFIXED_NAME(findptsms_free_3 )
+#define findptsms_3         GS_PREFIXED_NAME(findptsms_3      )
+#define findptsms_eval_3    GS_PREFIXED_NAME(findptsms_eval_3 )
 
-#define findpts_setup_2   PREFIXED_NAME(findpts_setup_2)
-#define findpts_free_2    PREFIXED_NAME(findpts_free_2 )
-#define findpts_2         PREFIXED_NAME(findpts_2      )
-#define findpts_eval_2    PREFIXED_NAME(findpts_eval_2 )
-#define findpts_setup_3   PREFIXED_NAME(findpts_setup_3)
-#define findpts_free_3    PREFIXED_NAME(findpts_free_3 )
-#define findpts_3         PREFIXED_NAME(findpts_3      )
-#define findpts_eval_3    PREFIXED_NAME(findpts_eval_3 )
+#define findpts_setup_2   GS_PREFIXED_NAME(findpts_setup_2)
+#define findpts_free_2    GS_PREFIXED_NAME(findpts_free_2 )
+#define findpts_2         GS_PREFIXED_NAME(findpts_2      )
+#define findpts_eval_2    GS_PREFIXED_NAME(findpts_eval_2 )
+#define findpts_setup_3   GS_PREFIXED_NAME(findpts_setup_3)
+#define findpts_free_3    GS_PREFIXED_NAME(findpts_free_3 )
+#define findpts_3         GS_PREFIXED_NAME(findpts_3      )
+#define findpts_eval_3    GS_PREFIXED_NAME(findpts_eval_3 )
 
-#define findptssurfms_setup_2 PREFIXED_NAME(findptssurfms_setup_2)
-#define findptssurfms_setup_3 PREFIXED_NAME(findptssurfms_setup_3)
-#define findptssurf_setup_2   PREFIXED_NAME(findptssurf_setup_2)
-#define findptssurf_setup_3   PREFIXED_NAME(findptssurf_setup_3)
+#define findptssurfms_setup_2 GS_PREFIXED_NAME(findptssurfms_setup_2)
+#define findptssurfms_setup_3 GS_PREFIXED_NAME(findptssurfms_setup_3)
+#define findptssurf_setup_2   GS_PREFIXED_NAME(findptssurf_setup_2)
+#define findptssurf_setup_3   GS_PREFIXED_NAME(findptssurf_setup_3)
 
 struct findpts_data_2;
 struct findpts_data_3;
@@ -37,7 +37,7 @@ struct findpts_data_2 *findptsms_setup_2(
   const unsigned n[2], const uint nel,
   const unsigned m[2], const double bbox_tol,
   const uint local_hash_size, const uint global_hash_size,
-  const unsigned npt_max, const double newt_tol, 
+  const unsigned npt_max, const double newt_tol,
   const uint *const nsid, const double *const distfint);
 
 struct findpts_data_2 *findptssurfms_setup_2( const struct comm *const comm,
@@ -49,7 +49,7 @@ struct findpts_data_2 *findptssurfms_setup_2( const struct comm *const comm,
                                             const uint local_hash_size,
                                             const uint global_hash_size,
                                             const unsigned npt_max,
-                                            const double newt_tol, 
+                                            const double newt_tol,
                                             const uint *const nsid,
                                             const double *const distfint );
 
@@ -87,7 +87,7 @@ void findptsms_2(      uint   *const        code_base, const unsigned       code
                  const uint   *const  session_id_base, const unsigned session_id_stride,
                  const uint   *const session_id_match, const uint                   npt,
                       struct findpts_data_2 *const fd);
- 
+
 void findptsms_3(      uint   *const        code_base, const unsigned       code_stride,
                        uint   *const        proc_base, const unsigned       proc_stride,
                        uint   *const          el_base, const unsigned         el_stride,
@@ -106,7 +106,7 @@ void findptsms_eval_2(
   const double *const    r_base, const unsigned    r_stride,
   const uint npt,
   const double *const in, struct findpts_data_2 *const fd);
- 
+
 void findptsms_eval_3(
         double *const  out_base, const unsigned  out_stride,
   const uint   *const code_base, const unsigned code_stride,
