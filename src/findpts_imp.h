@@ -96,7 +96,6 @@ static void hash_bb(struct hash_data *p, const struct local_hash_data *lp,
 
   ghs = hash_size; comm_allreduce(comm,gs_double,gs_add,&ghs,1,buf);
   hash_setfac(p,lceil(pow(ghs,1./D)));
-
   #ifdef DIAGNOSTICS
   if(comm->id==0) {
     printf("global bounding box (%g^%u):\n",(double)p->hash_n,D);
@@ -361,7 +360,6 @@ void findptsms(        uint   *const        code_base, const unsigned       code
     hash_pt.n = pt - (struct src_pt*)hash_pt.ptr;
     sarray_transfer(struct src_pt,&hash_pt,proc,1,&fd->cr);
   }
-
   /* look up points in hash cells, route to possible procs */
   {
     const uint *const hash_offset = fd->hash.offset;

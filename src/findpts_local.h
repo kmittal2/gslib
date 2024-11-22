@@ -88,7 +88,6 @@ void findpts_local_setup_2(struct findpts_local_data_2 *const fd,
                            const unsigned m[2], const double bbox_tol,
                            const uint max_hash_size,
                            const unsigned npt_max, const double newt_tol);
-
 void findptssurf_local_setup_2( struct findpts_local_data_2 *const fd,
                                const double *const elx[2],
                                const unsigned n[2],
@@ -100,7 +99,6 @@ void findptssurf_local_setup_2( struct findpts_local_data_2 *const fd,
                                const double newt_tol );
 
 void findpts_local_free_2(struct findpts_local_data_2 *const fd);
-
 void findpts_local_2(
         uint   *const  code_base   , const unsigned  code_stride   ,
         uint   *const    el_base   , const unsigned    el_stride   ,
@@ -109,7 +107,6 @@ void findpts_local_2(
   const double *const     x_base[2], const unsigned     x_stride[2],
   const uint npt, struct findpts_local_data_2 *const fd,
   buffer *buf);
-
 void findpts_local_eval_2(
         double *const out_base, const unsigned out_stride,
   const uint   *const  el_base, const unsigned  el_stride,
@@ -141,13 +138,13 @@ struct findpts_local_hash_data_3 {
 struct findpts_local_data_3 {
   unsigned ntot;
   const double *elx[3];
+  const unsigned *nsid;
   struct obbox_3 *obb;
   struct findpts_local_hash_data_3 hd;
   struct findpts_el_data_3 fed;
   double tol;
-  const unsigned *nsid;
   double *distrsti;
-  const double *distfint; 
+  const double *distfint;
   uint ims;
 };
 

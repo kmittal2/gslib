@@ -177,8 +177,7 @@ static void hash_bb(struct hash_data *p,
       }
     }
     for(d=0;d<D;++d) p->bnd[d]=bnd[d];
-  }
-  else {
+  } else {
     for(d=0;d<D;++d) p->bnd[d].max=p->bnd[d].min=0;
   }
 }
@@ -237,11 +236,11 @@ static void hash_free(struct hash_data *p) { free(p->offset); }
 struct findpts_local_data {
   unsigned ntot;
   const double *elx[D];
+  const unsigned *nsid;
   struct obbox *obb;
   struct hash_data hd;
   struct findpts_el_data fed;
   double tol;
-  const unsigned *nsid;
   double *distrsti;
   const double *distfint;
   uint ims;
@@ -502,18 +501,8 @@ void findptssurf_local_setup( struct findpts_local_data *const fd,
   uint ims          = 0;
   unsigned int nsid = 0;
   double distfint    = 0.;
-  findptssurfms_local_setup(             fd,
-                                       elx,
-                                     &nsid,
-                                  &distfint,
-                                         n,
-                                       nel,
-                                         m,
-                                  bbox_tol,
-                             max_hash_size,
-                                   npt_max,
-                                  newt_tol,
-                                       ims);
+  findptssurfms_local_setup(fd, elx, &nsid, &distfint, n, nel, m, bbox_tol,
+                            max_hash_size, npt_max, newt_tol, ims);
 }
 
 void findpts_local_free(struct findpts_local_data *const fd)
@@ -538,7 +527,6 @@ void findpts_local(
     *sess_match = 0;
     *disti_base = 0;
     *elsid_base = 0;
-
 
     unsigned sess_stride=0;
     unsigned disti_stride=0;
