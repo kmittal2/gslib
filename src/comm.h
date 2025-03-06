@@ -198,8 +198,13 @@ static void comm_split_(const struct comm *s, int bin, int key, struct comm *d,
 static void comm_free(struct comm *c)
 {
 #ifdef GSLIB_USE_MPI
-  MPI_Comm_free(&c->c);
-#endif
+  int mpi_is_finalized;
+  int mpi_err = MPI_Finalized(&mpi_is_finalized);
+  if (mpi_err == MPI_SUCCESS && !mpi_is_finalized)
+  {                   
+     MPI_Comm_free(&c->c);
+  }                    
+#endif 
 }
 
 static double comm_time(void)
