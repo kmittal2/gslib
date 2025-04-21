@@ -1,7 +1,6 @@
 #ifndef GS_MEM_H
 #define GS_MEM_H
 
-#include <stddef.h>
 /* requires:
      <stddef.h> for size_t, offsetof
      <stdlib.h> for malloc, calloc, realloc, free
@@ -13,16 +12,13 @@
 #if !defined(GS_C99_H) || !defined(GS_FAIL_H)
 #error "mem.h" requires "c99.h" and "fail.h"
 #endif
-#ifdef __cplusplus
-#include <string.h>
-#endif
 
-/*
+/* 
    All memory management goes through the wrappers defined in this
    header. Diagnostics can be turned on with
      -DPRINT_MALLOCS=1
    Then all memory management operations will be printed to stdout.
-
+   
    Most memory management occurs through use of the "array" type,
    defined below, which defines a generic dynamically-sized array
    that grows in bursts. The "buffer" type is a "char" array and
@@ -164,7 +160,7 @@ typedef struct array buffer;
 /*--------------------------------------------------------------------------
    Alignment routines
   --------------------------------------------------------------------------*/
-#if __cplusplus >= 201103L
+#if __cplusplus >= 201103L 
 #define ALIGNOF(T) alignof(T)
 #else
 #define ALIGNOF(T) offsetof(struct { char c; T x; }, x)

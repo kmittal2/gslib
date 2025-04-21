@@ -74,7 +74,7 @@ lagrange_fun *lagrange_setup(
 #define EPS   (128*DBL_EPSILON)
 #define PI 3.1415926535897932384626433832795028841971693993751058209749445923
 
-/*
+/* 
   For brevity's sake, some names have been shortened
   Quadrature rules
     Gauss   -> Gauss-Legendre quadrature (open)
