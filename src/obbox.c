@@ -173,13 +173,14 @@ void obbox_calc_2(struct obbox_2 *out,
       x0[1] = tensor_ig2(J+2, I0r,nr, I0s,ns, y, work);
       mat_inv_2(Ji, J);
 
-
+      /* double work[2*m##r] */
       #define DO_BOUND(bnd,merge,r,x,work) do { \
         struct dbl_range b = \
         lob_bnd_1(lob_bnd_data_##r,n##r,m##r, x, work); \
         if(merge) bnd=dbl_range_merge(bnd,b); else bnd=b; \
       } while(0)
 
+      /* double work[2*n##r + 2*m##r] */
       #define DO_EDGE(merge,r,x,y,work) do { \
         DO_BOUND(ab[0],merge,r,x,work); \
         DO_BOUND(ab[1],merge,r,y,work); \
@@ -191,6 +192,7 @@ void obbox_calc_2(struct obbox_2 *out,
       DO_EDGE(0,r,x,y,work);
       DO_EDGE(1,r,&x[nrs-nr],&y[nrs-nr],work);
 
+      /* double work[4*ns + 2*ms] */
       #define GET_EDGE(off) do { \
         copy_strided(work   , x+off,1,nr,ns); \
         copy_strided(work+ns, y+off,1,nr,ns); \
@@ -218,8 +220,10 @@ void obbox_calc_2(struct obbox_2 *out,
         out->A[0]=di0*Ji[0], out->A[1]=di0*Ji[1];
         out->A[2]=di1*Ji[2], out->A[3]=di1*Ji[3];
       }
+
     }
   }
+
   free(data);
 }
 
@@ -333,7 +337,6 @@ void obbox_calc_3(struct obbox_3 *out,
         out->A[3]=di1*Ji[3], out->A[4]=di1*Ji[4], out->A[5]=di1*Ji[5];
         out->A[6]=di2*Ji[6], out->A[7]=di2*Ji[7], out->A[8]=di2*Ji[8];
       }
-
     }
   }
 
@@ -558,9 +561,14 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       tv[8] = tv[8]/nmag;
 
 
-      // // Rodrigues formula to compute the rotation matrix
-      // double axis[3]; // cross product between normal vector and z-axis
-      const double nmag2 = sqrt(tv[6]*tv[6] + tv[7]*tv[7]);
+      // Rodrigues formula to compute the rotation matrix
+      // Axis of rotation is n x [0,0,1] = [n_2, -n_1, 0], and we must
+      // normalize it
+      double nmag2 = tv[6]*tv[6] + tv[7]*tv[7];
+      if (nmag2 > 0)
+      {
+        nmag2 = sqrt(nmag2);
+      }
       tv[7] = tv[7]/nmag2;
       tv[6] = tv[6]/nmag2;
       #define kx tv[7]
@@ -568,11 +576,7 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       #define kz 0.0
 
       double ct = tv[8];
-      double st = 1.0 - ct*ct;
-      if (st > 0.0)
-      {
-        st = sqrt(st);
-      }
+      double st = nmag2; //1.0 - ct*ct;
 
       // row-major
       A[0] = 1.0 + st*0.0 + (1.0-ct)*(-ky*ky-kz*kz);
@@ -618,7 +622,7 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       bbox_3_tfm(xtfm, x0,A, x,y,z,nrs);
       // The rotated z-coords are used to calculate z-bounds.
       DO_BOUND(tb[2],r,s,xtfm+2*nrs,work);
-      // OBB - expand in z-direction by aabb_diag_len only if the rotate
+      // OBB - expand in z-direction by aabb_diag_len only if the rotated
       // element is possibly planar.
       if (fabs(tb[2].max-tb[2].min) < 1e-10*aabb_diag_len)
       {

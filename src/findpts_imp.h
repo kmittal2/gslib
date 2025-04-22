@@ -41,8 +41,7 @@
 #define setup_fev_aux         GS_TOKEN_PASTE(setup_fev_aux_,D)
 
 #define findptssurf_setup         GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_setup_)        ,D)
-#define findptssurfms_setup       GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurfms_setup_)      ,D)
-#define findptssurfms_local_setup GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurfms_local_setup_),D)
+#define findptssurf_local_setup GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_local_setup_),D)
 
 struct hash_data {
   ulong hash_n;
@@ -256,30 +255,6 @@ struct findpts_data *findptsms_setup(
   crystal_init(&fd->cr,comm);
   setupms_aux(fd,elx,n,nel,m,bbox_tol,
             local_hash_size,global_hash_size,npt_max,newt_tol,nsid, distfint,ims);
-  return fd;
-}
-
-struct findpts_data *findptssurfms_setup( const struct comm *const comm,
-                                        const double *const elx[D],
-                                        const unsigned n[D-1],
-                                        const uint nel,
-                                        const unsigned m[D-1],
-                                        const double bbox_tol,
-                                        const uint local_hash_size,
-                                        const uint global_hash_size,
-                                        const unsigned npt_max,
-                                        const double newt_tol,
-                                        const uint *const nsid,
-                                        const double *const distfint )
-{
-  uint ims=1;
-  struct findpts_data *const fd = tmalloc(struct findpts_data, 1);
-  crystal_init(&fd->cr,comm);
-  findptssurfms_local_setup(&fd->local,elx,nsid,distfint,n,nel,m,bbox_tol,local_hash_size, npt_max, newt_tol,ims);
-  /* skip hash_build
-    hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,global_hash_size,&fd->cr);
-  */
-  fd->fevsetup = 0;
   return fd;
 }
 
@@ -683,24 +658,19 @@ struct findpts_data *findptssurf_setup( const struct comm *const comm,
                                       const double newt_tol )
 {
   struct findpts_data *const fd = tmalloc(struct findpts_data, 1);
-  uint ims         = 0;
   fd->fdms.nsid    = 0;
   fd->fdms.distfint = 0;
   crystal_init(&fd->cr,comm);
-  findptssurfms_local_setup( &fd->local,
+  findptssurf_local_setup( &fd->local,
                             elx,
-                            fd->fdms.nsid,
-                            fd->fdms.distfint,
                             n,
                             nel,
                             m,
                             bbox_tol,
                             local_hash_size,
                             npt_max,
-                            newt_tol,
-                            ims );
+                            newt_tol);
   hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,global_hash_size,&fd->cr);
-
   fd->fevsetup = 0;
   return fd;
 }
@@ -795,5 +765,4 @@ void findpts_eval(
 #undef findpts_setup
 
 #undef findptssurf_setup
-#undef findptssurfms_setup
-#undef findptssurfms_local_setup
+#undef findptssurf_local_setup
