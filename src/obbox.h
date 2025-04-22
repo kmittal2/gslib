@@ -10,20 +10,26 @@
 
 #define obboxsurf_calc_2 GS_PREFIXED_NAME(obboxsurf_calc_2)
 #define obboxsurf_calc_3 GS_PREFIXED_NAME(obboxsurf_calc_3)
+
 /*--------------------------------------------------------------------------
    Oriented and axis-aligned bounding box computation for spectral elements
+
    Usage:
+
      double x[n][nt][ns][nr], y[n][nt][ns][nr], z[n][nt][ns][nr];
      obbox_3 ob[n];
 
      unsigned mr=4*nr, ms=4*ns, mt=4*nt;
      double tol = 1e-6;
      obbox_3_calc(ob, x,y,z, nr,ns,nt,n, mr,ms,mt, tol);
+
    The parameters mr,ms,mt specify number of points to use in computing
    bounds (see lob_bnd.h). It is expected that mr>nr, etc. For reasonable
    quality, a factor of at least 2 is recommended.
+
    tol is a relative amount by which to expand the bounding box.
    This would accommodate, e.g., rounding errors.
+
    The axis aligned bounds for a given element are
      ob[i].x.min <= x <= ob[i].x.max
      ob[i].y.min <= y <= ob[i].y.max
@@ -31,6 +37,7 @@
 
    The oriented bounding box is given by
      (-1,-1,-1)^T <= ob[i].A * (x - ob[i].c0) <= (1,1,1)
+
    where the matrix is row-major format,
      dx = x - c0[0], dy = y - c0[1], dz = z - c0[2]
      -1 <= r[0] = A[0]*dx + A[1]*dy + A[2]*dz <= 1
@@ -38,6 +45,7 @@
      -1 <= r[2] = A[6]*dx + A[7]*dy + A[8]*dz <= 1
 
    Also, ob[i].A * (x - ob[i].c0) should be a reasonable seed for Newton's.
+
   --------------------------------------------------------------------------*/
 
 #ifndef GS_LOB_BND_H
