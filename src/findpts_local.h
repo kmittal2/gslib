@@ -17,6 +17,7 @@
 
 #define findptssurfms_local_setup_2 GS_PREFIXED_NAME(findptssurfms_local_setup_2)
 #define findptssurf_local_setup_2   GS_PREFIXED_NAME(findptssurf_local_setup_2)
+#define findptssurf_local_free_2    GS_PREFIXED_NAME(findptssurf_local_free_2 )
 
 struct findpts_local_hash_data_2 {
   uint hash_n;
@@ -114,6 +115,9 @@ void findpts_local_eval_2(
   const uint npt,
   const double *const in, struct findpts_local_data_2 *const fd);
 
+void findptssurf_local_free_2(struct findpts_local_data_2 *const fd);
+
+
 #define findptsms_local_setup_3   GS_PREFIXED_NAME(findptsms_local_setup_3)
 #define findptsms_local_free_3    GS_PREFIXED_NAME(findptsms_local_free_3 )
 #define findptsms_local_3         GS_PREFIXED_NAME(findptsms_local_3      )
@@ -126,6 +130,7 @@ void findpts_local_eval_2(
 
 #define findptssurfms_local_setup_3 GS_PREFIXED_NAME(findptssurfms_local_setup_3)
 #define findptssurf_local_setup_3   GS_PREFIXED_NAME(findptssurf_local_setup_3)
+#define findptssurf_local_free_3    GS_PREFIXED_NAME(findptssurf_local_free_3 )
 
 struct findpts_local_hash_data_3 {
   uint hash_n;
@@ -171,6 +176,7 @@ void findptssurfms_local_setup_3( struct findpts_local_data_3 *const fd,
                                  const uint ims );
 
 void findptsms_local_free_3(struct findpts_local_data_3 *const fd);
+void findptssurf_local_free_3(struct findpts_local_data_3 *const fd);
 
 void findptsms_local_3(
         uint   *const        code_base, const unsigned       code_stride,

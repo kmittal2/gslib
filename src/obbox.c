@@ -568,9 +568,9 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
       if (nmag2 > 0)
       {
         nmag2 = sqrt(nmag2);
+        tv[7] = tv[7]/nmag2;
+        tv[6] = tv[6]/nmag2;
       }
-      tv[7] = tv[7]/nmag2;
-      tv[6] = tv[6]/nmag2;
       #define kx tv[7]
       #define ky -tv[6]
       #define kz 0.0

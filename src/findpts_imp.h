@@ -40,8 +40,10 @@
 #define findpts_eval          GS_TOKEN_PASTE(GS_PREFIXED_NAME(findpts_eval_ ),D)
 #define setup_fev_aux         GS_TOKEN_PASTE(setup_fev_aux_,D)
 
-#define findptssurf_setup         GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_setup_)        ,D)
+#define findptssurf_setup       GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_setup_)        ,D)
 #define findptssurf_local_setup GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_local_setup_),D)
+#define findptssurf_free        GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_free_ ),D)
+#define findptssurf_local_free  GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_local_free_ ),D)
 
 struct hash_data {
   ulong hash_n;
@@ -680,6 +682,15 @@ void findpts_free(struct findpts_data *fd)
   findptsms_free(fd);
 }
 
+void findptssurf_free(struct findpts_data *fd)
+{
+  hash_free(&fd->hash);
+  findptssurf_local_free(&fd->local); 
+  crystal_free(&fd->cr);
+  if (fd->fevsetup==1) array_free(&fd->savpt);
+  free(fd);
+}
+
 void findpts(      uint   *const  code_base   , const unsigned  code_stride   ,
                    uint   *const  proc_base   , const unsigned  proc_stride   ,
                    uint   *const    el_base   , const unsigned    el_stride   ,
@@ -760,9 +771,8 @@ void findpts_eval(
 #undef obbox
 
 #undef findpts_eval
-#undef findpts
-#undef findpts_free
-#undef findpts_setup
 
 #undef findptssurf_setup
 #undef findptssurf_local_setup
+#undef findptssurf_local_free
+#undef findptssurf_free

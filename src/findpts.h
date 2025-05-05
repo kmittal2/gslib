@@ -25,6 +25,8 @@
 
 #define findptssurf_setup_2   GS_PREFIXED_NAME(findptssurf_setup_2)
 #define findptssurf_setup_3   GS_PREFIXED_NAME(findptssurf_setup_3)
+#define findptssurf_free_2    GS_PREFIXED_NAME(findptssurf_free_2 )
+#define findptssurf_free_3    GS_PREFIXED_NAME(findptssurf_free_3 )
 
 struct findpts_data_2;
 struct findpts_data_3;
@@ -128,6 +130,8 @@ struct findpts_data_3 *findptssurf_setup_3( const struct comm *const comm,
 
 void findpts_free_2(struct findpts_data_2 *fd);
 void findpts_free_3(struct findpts_data_3 *fd);
+void findptssurf_free_2(struct findpts_data_2 *fd);
+void findptssurf_free_3(struct findpts_data_3 *fd);
 
 void findpts_2(    uint   *const  code_base   , const unsigned  code_stride   ,
                    uint   *const  proc_base   , const unsigned  proc_stride   ,

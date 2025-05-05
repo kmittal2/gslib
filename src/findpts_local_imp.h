@@ -34,6 +34,8 @@
 
 #define findptssurf_local_setup   GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_local_setup_),D)
 #define obboxsurf_calc           GS_TOKEN_PASTE(GS_PREFIXED_NAME(obboxsurf_calc_),D)
+#define findptssurf_local_free   GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_local_free_),D)
+
 /*--------------------------------------------------------------------------
    Point to Possible Elements Hashing
 
@@ -279,6 +281,12 @@ void findptsms_local_free(struct findpts_local_data *const fd)
   if (fd->ims==1) {
    free(fd->distrsti);
   }
+}
+
+void findptssurf_local_free(struct findpts_local_data *const fd)
+{
+  hash_free(&fd->hd);
+  free(fd->obb);
 }
 
 #define   AT(T,var,i)   \
@@ -571,3 +579,4 @@ void findpts_local_eval(
 
 #undef findptssurf_local_setup
 #undef obboxsurf_calc
+#undef findptssurf_local_free
