@@ -8,6 +8,8 @@
 #define obbox_calc_2  GS_PREFIXED_NAME(obbox_calc_2)
 #define obbox_calc_3  GS_PREFIXED_NAME(obbox_calc_3)
 
+#define obboxedge_calc_2 GS_PREFIXED_NAME(obboxedge_calc_2)
+#define obboxedge_calc_3 GS_PREFIXED_NAME(obboxedge_calc_3)
 #define obboxsurf_calc_2 GS_PREFIXED_NAME(obboxsurf_calc_2)
 #define obboxsurf_calc_3 GS_PREFIXED_NAME(obboxsurf_calc_3)
 
@@ -68,11 +70,25 @@ void obbox_calc_3(struct obbox_3 *out,
                   const unsigned n[3], uint nel,
                   const unsigned m[3], const double tol);
 
-void obboxsurf_calc_2(        struct obbox_2 *out,
+void obboxedge_calc_2(        struct obbox_2 *out,
                        const double *const elx[2],
                               const unsigned n[1],
                                          uint nel,
                               const unsigned m[1],
+                                 const double tol );
+
+void obboxedge_calc_3(        struct obbox_3 *out,
+                       const double *const elx[3],
+                              const unsigned n[1],
+                                         uint nel,
+                              const unsigned m[1],
+                                 const double tol );
+
+void obboxsurf_calc_2(        struct obbox_2 *out,
+                       const double *const elx[2],
+                              const unsigned n[2],
+                                         uint nel,
+                              const unsigned m[2],
                                  const double tol );
 
 void obboxsurf_calc_3(        struct obbox_3 *out,

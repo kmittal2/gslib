@@ -107,7 +107,8 @@ struct findpts_data_2 *findptssurf_setup_2( const struct comm *const comm,
                                           const uint local_hash_size,
                                           const uint global_hash_size,
                                           const unsigned npt_max,
-                                          const double newt_tol );
+                                          const double newt_tol,
+                                          const int rD );
 
 struct findpts_data_3 *findpts_setup_3(
   const struct comm *const comm,
@@ -126,7 +127,8 @@ struct findpts_data_3 *findptssurf_setup_3( const struct comm *const comm,
                                           const uint local_hash_size,
                                           const uint global_hash_size,
                                           const unsigned npt_max,
-                                          const double newt_tol );
+                                          const double newt_tol,
+                                          const int rD );
 
 void findpts_free_2(struct findpts_data_2 *fd);
 void findpts_free_3(struct findpts_data_3 *fd);

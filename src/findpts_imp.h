@@ -657,7 +657,8 @@ struct findpts_data *findptssurf_setup( const struct comm *const comm,
                                       const uint local_hash_size,
                                       const uint global_hash_size,
                                       const unsigned npt_max,
-                                      const double newt_tol )
+                                      const double newt_tol,
+                                      const int rD )
 {
   struct findpts_data *const fd = tmalloc(struct findpts_data, 1);
   fd->fdms.nsid    = 0;
@@ -671,7 +672,7 @@ struct findpts_data *findptssurf_setup( const struct comm *const comm,
                             bbox_tol,
                             local_hash_size,
                             npt_max,
-                            newt_tol);
+                            newt_tol, rD);
   hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,global_hash_size,&fd->cr);
   fd->fevsetup = 0;
   return fd;
@@ -685,7 +686,7 @@ void findpts_free(struct findpts_data *fd)
 void findptssurf_free(struct findpts_data *fd)
 {
   hash_free(&fd->hash);
-  findptssurf_local_free(&fd->local); 
+  findptssurf_local_free(&fd->local);
   crystal_free(&fd->cr);
   if (fd->fevsetup==1) array_free(&fd->savpt);
   free(fd);

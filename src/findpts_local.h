@@ -15,7 +15,6 @@
 #define findpts_local_2         GS_PREFIXED_NAME(findpts_local_2      )
 #define findpts_local_eval_2    GS_PREFIXED_NAME(findpts_local_eval_2 )
 
-#define findptssurfms_local_setup_2 GS_PREFIXED_NAME(findptssurfms_local_setup_2)
 #define findptssurf_local_setup_2   GS_PREFIXED_NAME(findptssurf_local_setup_2)
 #define findptssurf_local_free_2    GS_PREFIXED_NAME(findptssurf_local_free_2 )
 
@@ -48,19 +47,6 @@ void findptsms_local_setup_2(struct findpts_local_data_2 *const fd,
                            const unsigned m[2], const double bbox_tol,
                            const uint max_hash_size,
                            const unsigned npt_max, const double newt_tol,const uint ims);
-
-void findptssurfms_local_setup_2( struct findpts_local_data_2 *const fd,
-                                 const double *const elx[2],
-                                 const unsigned *const nsid,
-                                 const double *const distfint,
-                                 const unsigned n[2],
-                                 const uint nel,
-                                 const unsigned m[2],
-                                 const double bbox_tol,
-                                 const uint max_hash_size,
-                                 const unsigned npt_max,
-                                 const double newt_tol,
-                                 const uint ims );
 
 void findptsms_local_free_2(struct findpts_local_data_2 *const fd);
 
@@ -97,7 +83,8 @@ void findptssurf_local_setup_2( struct findpts_local_data_2 *const fd,
                                const double bbox_tol,
                                const uint max_hash_size,
                                const unsigned npt_max,
-                               const double newt_tol );
+                               const double newt_tol,
+                               const int rD );
 
 void findpts_local_free_2(struct findpts_local_data_2 *const fd);
 void findpts_local_2(
@@ -128,7 +115,6 @@ void findptssurf_local_free_2(struct findpts_local_data_2 *const fd);
 #define findpts_local_3         GS_PREFIXED_NAME(findpts_local_3      )
 #define findpts_local_eval_3    GS_PREFIXED_NAME(findpts_local_eval_3 )
 
-#define findptssurfms_local_setup_3 GS_PREFIXED_NAME(findptssurfms_local_setup_3)
 #define findptssurf_local_setup_3   GS_PREFIXED_NAME(findptssurf_local_setup_3)
 #define findptssurf_local_free_3    GS_PREFIXED_NAME(findptssurf_local_free_3 )
 
@@ -161,19 +147,6 @@ void findptsms_local_setup_3(struct findpts_local_data_3 *const fd,
                            const unsigned m[3], const double bbox_tol,
                            const uint max_hash_size,
                            const unsigned npt_max, const double newt_tol,const uint ims);
-
-void findptssurfms_local_setup_3( struct findpts_local_data_3 *const fd,
-                                 const double *const elx[3],
-                                 const unsigned *const nsid,
-                                 const double *const distfint,
-                                 const unsigned n[3],
-                                 const uint nel,
-                                 const unsigned m[3],
-                                 const double bbox_tol,
-                                 const uint max_hash_size,
-                                 const unsigned npt_max,
-                                 const double newt_tol,
-                                 const uint ims );
 
 void findptsms_local_free_3(struct findpts_local_data_3 *const fd);
 void findptssurf_local_free_3(struct findpts_local_data_3 *const fd);
@@ -212,7 +185,8 @@ void findptssurf_local_setup_3( struct findpts_local_data_3 *const fd,
                                const double bbox_tol,
                                const uint max_hash_size,
                                const unsigned npt_max,
-                               const double newt_tol );
+                               const double newt_tol,
+                               const int rD );
 
 void findpts_local_free_3(struct findpts_local_data_3 *const fd);
 

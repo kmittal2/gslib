@@ -15,6 +15,8 @@
 #define obbox_calc_2  GS_PREFIXED_NAME(obbox_calc_2)
 #define obbox_calc_3  GS_PREFIXED_NAME(obbox_calc_3)
 
+#define obboxedge_calc_2 GS_PREFIXED_NAME(obboxedge_calc_2)
+#define obboxedge_calc_3 GS_PREFIXED_NAME(obboxedge_calc_3)
 #define obboxsurf_calc_2 GS_PREFIXED_NAME(obboxsurf_calc_2)
 #define obboxsurf_calc_3 GS_PREFIXED_NAME(obboxsurf_calc_3)
 
@@ -368,7 +370,7 @@ double dbl_range_diag_expand_3(struct dbl_range *m, struct dbl_range b[3], doubl
   return len;
 }
 
-void obboxsurf_calc_2(        struct obbox_2 *out,
+void obboxedge_calc_2(        struct obbox_2 *out,
                        const double *const elx[2],
                               const unsigned n[1],
                                          uint nel,
@@ -471,6 +473,160 @@ void obboxsurf_calc_2(        struct obbox_2 *out,
   free(data);
 }
 
+void obboxedge_calc_3(        struct obbox_3 *out,
+                       const double *const elx[3],
+                              const unsigned n[1],
+                                         uint nel,
+                              const unsigned m[1],
+                                 const double tol )
+{
+  const double *x   = elx[0],
+               *y   = elx[1],
+               *z   = elx[2];
+  const unsigned nr = n[0],
+                 mr = m[0];
+
+  double *data;
+  const unsigned lbsize0 = lob_bnd_size(nr,mr);
+
+  unsigned wsize = 4*nr+2*mr;
+  DO_MAX(wsize,gll_lag_size(nr));
+
+  // A big vector that stores all data related to bounds and all the work arrays
+  data = tmalloc(double, 2*nr + lbsize0 + wsize);
+
+  {
+    double *const I0r = data,                          // 2*nr doubles
+           *const lob_bnd_data_r = data + 2*nr,        // lbsize0 doubles
+           *const work = data + 2*nr + lbsize0;        // wsize doubles
+
+    #define SETUP_DIR(r) do { \
+      lagrange_fun *const lag = gll_lag_setup(work, n##r); \
+      lag(I0##r, work,n##r,1, 0); \
+      lob_bnd_setup(lob_bnd_data_##r, n##r,m##r); \
+    } while(0)
+
+    SETUP_DIR(r);
+    #undef SETUP_DIR
+
+    // Loop over all elements; note the decrementing nel
+    uint nelorig = nel;
+    for( ; nel; --nel,x+=nr,y+=nr,z+=nr,++out) {
+      double x0[3], A[9], Ai[9];
+      struct dbl_range ab[3], tb[3];
+
+      x0[0] = tensor_ig1(A  ,I0r,nr,x);
+      // A[0] = dx/dr, x0[0] = x(r=0), i.e., element center
+      x0[1] = tensor_ig1(A+1,I0r,nr,y);
+      // A[1] = dy/dr, x0[1] = y(r=0), i.e., element center
+      x0[2] = tensor_ig1(A+2,I0r,nr,z);
+      // A[2] = dz/dr, x0[2] = z(r=0), i.e., element center
+
+      // normalize the normal vector
+      double nmag  = A[0]*A[0] + A[1]*A[1] + A[2]*A[2];
+      if (nmag > 0)
+      {
+        nmag = sqrt(nmag);
+        A[0] = A[0]/nmag;
+        A[1] = A[1]/nmag;
+        A[2] = A[2]/nmag;
+      }
+
+      double nmag2 = A[0]*A[0] + A[1]*A[1];
+      if (nmag2 > 0)
+      {
+        nmag2 = sqrt(nmag2);
+        A[1] = A[1]/nmag2;
+        A[0] = A[0]/nmag2;
+      }
+      double kx = A[1];
+      double ky = -A[0];
+      double kz = 0.0;
+
+      double ct = A[2];
+      double st = nmag2; //1.0 - ct*ct;
+
+      // row-major
+      A[0] = 1.0 + st*0.0 + (1.0-ct)*(-ky*ky-kz*kz);
+      A[1] = 0.0 + st*(0.0) + (1.0-ct)*(kx*ky);
+      A[2] = 0.0 + st*(ky) + (1.0-ct)*(kx*kz);
+
+      A[3] = 0.0 + st*(0.0) + (1.0-ct)*(kx*ky);
+      A[4] = 1.0 + st*(0.0) + (1.0-ct)*(-kx*kx-kz*kz);
+      A[5] = 0.0 + st*(-kx) + (1.0-ct)*(ky*kz);
+
+      A[6] = 0.0 + st*(-ky) + (1.0-ct)*(kx*kz);
+      A[7] = 0.0 + st*(kx) + (1.0-ct)*(ky*kz);
+      A[8] = 1.0 + st*(0.0) + (1.0-ct)*(-kx*kx-ky*ky);
+      /* At this stage, A has the rotation matrix that captures the rotation the
+       * physical nodes require to align the tangent at element center with the
+       * x-axis.
+       */
+
+      mat_inv_3(Ai, A);
+
+      /* double work[2*m##r]
+       * Find the bounds along a specific physical dimension.
+       */
+      #define DO_BOUND(bnd,r,x,work) do { \
+        bnd = lob_bnd_1(lob_bnd_data_##r,n##r,m##r, x, work); \
+      } while(0)
+
+      /* double work[2*n##r + 2*m##r] */
+      #define DO_EDGE(r,x,y,z,work) do { \
+        DO_BOUND(ab[0],r,x,work); \
+        DO_BOUND(ab[1],r,y,work); \
+        DO_BOUND(ab[2],r,z,work); \
+        bbox_3_tfm(work, x0, A, x,y,z,n##r); \
+        DO_BOUND(tb[0],r,(work),(work)+3*n##r); \
+        DO_BOUND(tb[1],r,(work)+n##r,(work)+3*n##r); \
+        DO_BOUND(tb[2],r,(work)+2*n##r,(work)+3*n##r); \
+      } while(0)
+      DO_EDGE(r,x,y,z,work);
+      #undef DO_EDGE
+      #undef DO_BOUND
+
+      double aabb_diag_len = dbl_range_diag_expand_3(out->x, ab, tol);
+
+      {
+        const double av0 = (tb[0].min+tb[0].max)/2,
+                     av1 = (tb[1].min+tb[1].max)/2,
+                     av2 = (tb[2].min+tb[2].max)/2;
+        out->c0[0] = x0[0] + Ai[0]*av0 + Ai[1]*av1 + Ai[2]*av2;
+        out->c0[1] = x0[1] + Ai[3]*av0 + Ai[4]*av1 + Ai[5]*av2;
+        out->c0[2] = x0[2] + Ai[6]*av0 + Ai[7]*av1 + Ai[8]*av2;
+      }
+
+      // Expand by aabb_diag_len only if the element is possibly planar
+      for (int dd = 0; dd < 3; dd++)
+      {
+        if (fabs(tb[dd].max-tb[dd].min) < 1e-10*aabb_diag_len)
+        {
+          tb[dd].min -= aabb_diag_len;
+          tb[dd].max += aabb_diag_len;
+        }
+      }
+      {
+        const double di0 = 2/((1+tol)*(tb[0].max-tb[0].min)),
+                     di1 = 2/((1+tol)*(tb[1].max-tb[1].min)),
+                     di2 = 2/((1+tol)*(tb[2].max-tb[2].min));
+        out->A[0]=di0*A[0], out->A[1]=di0*A[1], out->A[2]=di0*A[2];
+        out->A[3]=di1*A[3], out->A[4]=di1*A[4], out->A[5]=di1*A[5];
+        out->A[6]=di2*A[6], out->A[7]=di2*A[7], out->A[8]=di2*A[8];
+      }
+    }
+  }
+  free(data);
+}
+
+void obboxsurf_calc_2(        struct obbox_2 *out,
+                       const double *const elx[2],
+                              const unsigned n[2],
+                                         uint nel,
+                              const unsigned m[2],
+                                 const double tol )
+{}
+
 void obboxsurf_calc_3(        struct obbox_3 *out,
                        const double *const elx[3],
                               const unsigned n[2],
@@ -571,9 +727,9 @@ void obboxsurf_calc_3(        struct obbox_3 *out,
         tv[7] = tv[7]/nmag2;
         tv[6] = tv[6]/nmag2;
       }
-      #define kx tv[7]
-      #define ky -tv[6]
-      #define kz 0.0
+      double kx = tv[7];
+      double ky = -tv[6];
+      double kz = 0.0;
 
       double ct = tv[8];
       double st = nmag2; //1.0 - ct*ct;
