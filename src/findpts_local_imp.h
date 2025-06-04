@@ -494,7 +494,8 @@ void findptssurf_local_setup( struct findpts_local_data *const fd,
     obboxsurf_calc(fd->obb,elx,n,nel,m,bbox_tol);
   }
   hash_build(&fd->hd,fd->obb,nel,max_hash_size);
-  // skip setting other components of fd such as fed, tol, ims, nsid etc.
+  fd->tol = newt_tol;
+  // skip setting other components of fd such as fed, ims, nsid etc.
 }
 
 void findpts_local_free(struct findpts_local_data *const fd)

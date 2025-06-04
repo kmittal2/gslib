@@ -44,6 +44,7 @@
 #define findptssurf_local_setup GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_local_setup_),D)
 #define findptssurf_free        GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_free_ ),D)
 #define findptssurf_local_free  GS_TOKEN_PASTE(GS_PREFIXED_NAME(findptssurf_local_free_ ),D)
+#define dummy_pt           GS_TOKEN_PASTE(dummy_pt_ ,D)
 
 struct hash_data {
   ulong hash_n;
@@ -648,6 +649,8 @@ struct findpts_data *findpts_setup(
   return fd;
 }
 
+struct dummy_pt { uint el; };
+
 struct findpts_data *findptssurf_setup( const struct comm *const comm,
                                       const double *const elx[D],
                                       const unsigned n[D-1],
@@ -675,6 +678,10 @@ struct findpts_data *findptssurf_setup( const struct comm *const comm,
                             newt_tol, rD);
   hash_build(&fd->hash,&fd->local.hd,fd->local.obb,nel,global_hash_size,&fd->cr);
   fd->fevsetup = 0;
+  {
+    struct dummy_pt *pt;
+    array_init(struct dummy_pt,&fd->savpt,0), fd->savpt.n=0;
+  }
   return fd;
 }
 
@@ -688,7 +695,7 @@ void findptssurf_free(struct findpts_data *fd)
   hash_free(&fd->hash);
   findptssurf_local_free(&fd->local);
   crystal_free(&fd->cr);
-  if (fd->fevsetup==1) array_free(&fd->savpt);
+  array_free(&fd->savpt);
   free(fd);
 }
 
@@ -770,6 +777,7 @@ void findpts_eval(
 #undef hash_data
 #undef local_hash_data
 #undef obbox
+#undef dummy_pt
 
 #undef findpts_eval
 
