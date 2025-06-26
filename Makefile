@@ -126,7 +126,8 @@ GS = $(SRCDIR)/gs.o $(SRCDIR)/sort.o $(SRCDIR)/sarray_transfer.o \
 
 FWRAPPER = $(SRCDIR)/fcrystal.o $(SRCDIR)/findpts.o
 
-INTP = $(SRCDIR)/findpts_local.o $(SRCDIR)/obbox.o $(SRCDIR)/poly.o \
+INTP = $(SRCDIR)/local_hash.o $(SRCDIR)/global_hash.o \
+       $(SRCDIR)/findpts_local.o $(SRCDIR)/obbox.o $(SRCDIR)/poly.o \
        $(SRCDIR)/lob_bnd.o $(SRCDIR)/findpts_el_3.o $(SRCDIR)/findpts_el_2.o
 
 .PHONY: all lib install tests clean objects

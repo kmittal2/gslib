@@ -11,6 +11,7 @@
 #include "poly.h"
 #include "obbox.h"
 #include "findpts_el.h"
+#include "local_hash.h"
 #include "findpts_local.h"
 #include "gs_defs.h"
 #include "comm.h"
@@ -18,6 +19,7 @@
 #include "sarray_transfer.h"
 #include "sort.h"
 #include "sarray_sort.h"
+#include "global_hash.h"
 /*
 #define DIAGNOSTICS
 */
@@ -34,12 +36,6 @@ struct proc_index { uint proc, index; };
 
 static slong lfloor(double x) { return floor(x); }
 static slong lceil (double x) { return ceil (x); }
-
-static ulong hash_index_aux(double low, double fac, ulong n, double x)
-{
-  const slong i = lfloor((x-low)*fac);
-  return i<0 ? 0 : (n-1<(ulong)i ? n-1 : (ulong)i);
-}
 
 static void set_bit(unsigned char *const p, const uint i)
 {
@@ -69,6 +65,15 @@ static uint count_bits(unsigned char *p, uint n)
   return sum;
 }
 
+static sint ifloor(double x) { return floor(x); }
+static sint iceil (double x) { return ceil (x); }
+static uint hash_index_aux(double low, double fac, uint n, double x)
+{
+  const sint i = ifloor((x-low)*fac);
+  return i<0 ? 0 : (n-1<(uint)i ? n-1 : (uint)i);
+}
+
+
 #define D 2
 #define WHEN_3D(a)
 #include "findpts_imp.h"
@@ -94,13 +99,13 @@ static uint count_bits(unsigned char *p, uint n)
                      npt_max, newt_tol,idsess,distf)
 
     (zm,nt,mt all ignored when ndim==2)
-                     
+
     h: (output) handle
     comm,np: MPI communicator and # of procs (checked against MPI_Comm_size)
     ndim: 2 or 3
     xm,ym,zm: element geometry (nodal x,y,z values)
     nr,ns,nt,nel: element dimensions --- e.g., xm(nr,ns,nt,nel)
-  
+
     mr,ms,mt: finer mesh size for bounding box computation;
               must be larger than nr,ns,nt for correctness,
               recommend at least 2*nr,2*ns,2*nt
@@ -112,7 +117,7 @@ static uint count_bits(unsigned char *p, uint n)
     loc_hash_size: e.g., nr*ns*nt*nel
                    maximum number of integers to use for local geom hash table;
                    minimum is nel+2 for the trivial table with one cell
-                 
+
     gbl_hash_size: e.g., nr*ns*nt*nel
                    approx number of cells per proc for the distributed
                      global geometric hash table
@@ -121,14 +126,14 @@ static uint count_bits(unsigned char *p, uint n)
                           -DGSLIB_USE_GLOBAL_LONG_LONG; see "types.h")
                    actual number of cells per proc will be greater by
                      ~ 3 gbl_hash_size^(2/3) / np^(1/3)
-  
+
     npt_max: e.g., 256
              number of points to iterate on simultaneously
              enables dominant complexity to be matrix-matrix products
                (there is a sweet spot --- too high and the cache runs out)
              the memory allocation term dependent on npt_max is
                (12 + 2*(nr+ns+nt+nr*ns)) * npt_max     doubles
-  
+
     newt_tol: e.g., 1024*DBL_EPSILON
               the iteration stops for a point when
                    the 1-norm of the step in (r,s,t) is smaller than newt_tol
@@ -136,15 +141,15 @@ static uint count_bits(unsigned char *p, uint n)
                   decrease is smaller than newt_tol * (the objective)
   Additional arguments for multisession findpts
     idsess: integer session ID number of the domain.. same for all elements
-            on a processor. findpts will ignore elements who have the 
+            on a processor. findpts will ignore elements who have the
             same session ID as that of the sought point by findpts
     distf : e.g. distance of each node from a surface
-            nodal field which will be maximized during search in findpts. 
+            nodal field which will be maximized during search in findpts.
 
   --------------------------------------------------------------------------
   call findpts_free(h)
   call findptsms_free(h)
-  
+
   --------------------------------------------------------------------------
   call findpts(h, code_base,  code_stride,
                   proc_base,  proc_stride,
@@ -162,8 +167,8 @@ static uint count_bits(unsigned char *p, uint n)
                  dist2_base, dist2_stride,
                      x_base,     x_stride,
                      y_base,     y_stride,
-                     z_base,     z_stride, 
-                  sess_base,  sess_stride, 
+                     z_base,     z_stride,
+                  sess_base,  sess_stride,
                  sess_match,          npt)
 
     (z_base, z_stride ignored when ndim==2)
@@ -186,8 +191,8 @@ static uint count_bits(unsigned char *p, uint n)
     sess_match: 1 - find points in elements who session id is same from points
 	      : 0 - find points in elements who session id is different from
                     points
-                
-    
+
+
     the *_base arguments point to the data for the first point,
       each is advanced by the corresponding *_stride argument for the next point
     this allows fairly arbitrary data layout,
@@ -202,13 +207,13 @@ static uint count_bits(unsigned char *p, uint n)
                          el_base,   el_stride,
                           r_base,    r_stride, npt,
                     input_field)
-  
+
     may be called immediately after findpts (or any other time)
     to evaluate input_field at the given points ---
       these specified by code,proc,el,r(ndim) and possibly remote
     --- storing the interpolated values in out
           [that is, at out_base(1+out_stride*(point_index-1)) ]
-    
+
     for example, following a call to findpts, a call to findpts_eval with
       input_field = xm, will ideally result in out = x(1) for each point,
       or x(2) for ym, x(3) for zm
@@ -404,14 +409,14 @@ void ffindptsms(const sint *const handle,
     sess_base   =  session_id_base;
     sess_stride = *session_id_stride*sizeof(uint);
     sess_match  =  session_id_match;
-     
+
     GS_PREFIXED_NAME(findptsms_2)(
       (uint*) code_base,(* code_stride)*sizeof(sint  ),
       (uint*) proc_base,(* proc_stride)*sizeof(sint  ),
       (uint*)   el_base,(*   el_stride)*sizeof(sint  ),
                  r_base,(*    r_stride)*sizeof(double),
              dist2_base,(*dist2_stride)*sizeof(double),
-                xv_base,     xv_stride                , 
+                xv_base,     xv_stride                ,
               sess_base,   sess_stride                ,
              sess_match, *npt, h->data);
   } else {

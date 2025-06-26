@@ -27,9 +27,9 @@ struct findpts_el_data_2 {
   lagrange_fun *lag[2];
   double *lag_data[2];
   double *wtend[2];
-  
+
   const double *x[2];
-  
+
   unsigned side_init;
   double *sides;
   struct findpts_el_gedge_2 edge[4]; /* R S=-1; R S=1; ... */
@@ -84,9 +84,9 @@ struct findpts_el_data_3 {
   lagrange_fun *lag[3];
   double *lag_data[3];
   double *wtend[3];
-  
+
   const double *x[3];
-  
+
   unsigned side_init;
   double *sides;
   struct findpts_el_gface_3 face[6]; /* ST R=-1,R=+1; TR S=-1,S=+1; ... */

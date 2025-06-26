@@ -1,8 +1,8 @@
 #ifndef GS_FINDPTS_LOCAL_H
 #define GS_FINDPTS_LOCAL_H
 
-#if !defined(GS_MEM_H) || !defined(GS_FINDPTS_EL_H) || !defined(GS_OBBOX_H)
-#warning "findpts_local.h" requires "mem.h", "findpts_el.h", "obbox.h"
+#if !defined(GS_MEM_H) || !defined(GS_FINDPTS_EL_H) || !defined(GS_OBBOX_H) || !defined(GS_FINDPTS_LOCAL_HASH_H)
+#warning "findpts_local.h" requires "mem.h", "findpts_el.h", "obbox.h", "local_hash.h"
 #endif
 
 #define findptsms_local_setup_2   GS_PREFIXED_NAME(findptsms_local_setup_2)
@@ -14,14 +14,6 @@
 #define findpts_local_free_2    GS_PREFIXED_NAME(findpts_local_free_2 )
 #define findpts_local_2         GS_PREFIXED_NAME(findpts_local_2      )
 #define findpts_local_eval_2    GS_PREFIXED_NAME(findpts_local_eval_2 )
-
-struct findpts_local_hash_data_2 {
-  uint hash_n;
-  struct dbl_range bnd[2];
-  double fac[2];
-  uint *offset;
-  uint max;
-};
 
 struct findpts_local_data_2 {
   unsigned ntot;
@@ -94,13 +86,6 @@ void findpts_local_eval_2(
 #define findpts_local_free_3    GS_PREFIXED_NAME(findpts_local_free_3 )
 #define findpts_local_3         GS_PREFIXED_NAME(findpts_local_3      )
 #define findpts_local_eval_3    GS_PREFIXED_NAME(findpts_local_eval_3 )
-struct findpts_local_hash_data_3 {
-  uint hash_n;
-  struct dbl_range bnd[3];
-  double fac[3];
-  uint *offset;
-  uint max;
-};
 
 struct findpts_local_data_3 {
   unsigned ntot;
@@ -111,7 +96,7 @@ struct findpts_local_data_3 {
   struct findpts_el_data_3 fed;
   double tol;
   double *distrsti;
-  const double *distfint; 
+  const double *distfint;
   uint ims;
 };
 

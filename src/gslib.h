@@ -30,7 +30,9 @@ extern "C" {
 #include "obbox.h"
 #include "findpts.h"
 #include "findpts_el.h"
+#include "local_hash.h"
 #include "findpts_local.h"
+#include "global_hash.h"
 #ifdef __cplusplus
 }
 #endif

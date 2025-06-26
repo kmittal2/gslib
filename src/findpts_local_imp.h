@@ -3,14 +3,14 @@
 #define obbox_calc          GS_TOKEN_PASTE(GS_PREFIXED_NAME(obbox_calc_),D)
 #define obbox_test          GS_TOKEN_PASTE(obbox_test_        ,D)
 #define hash_data           GS_TOKEN_PASTE(findpts_local_hash_data_,D)
-#define hash_index          GS_TOKEN_PASTE(hash_index_        ,D)
+#define local_hash_index          GS_TOKEN_PASTE(local_hash_index_        ,D)
 #define hash_setfac         GS_TOKEN_PASTE(hash_setfac_       ,D)
 #define hash_range          GS_TOKEN_PASTE(hash_range_        ,D)
 #define hash_count          GS_TOKEN_PASTE(hash_count_        ,D)
 #define hash_opt_size       GS_TOKEN_PASTE(hash_opt_size_,D)
 #define hash_bb             GS_TOKEN_PASTE(hash_bb_           ,D)
-#define hash_build          GS_TOKEN_PASTE(hash_build_        ,D)
-#define hash_free           GS_TOKEN_PASTE(hash_free_         ,D)
+#define local_hash_build          GS_TOKEN_PASTE(local_hash_build_        ,D)
+#define local_hash_free           GS_TOKEN_PASTE(local_hash_free_         ,D)
 #define findpts_el_data     GS_TOKEN_PASTE(findpts_el_data_   ,D)
 #define findpts_el_pt       GS_TOKEN_PASTE(findpts_el_pt_     ,D)
 #define findpts_el_setup    GS_TOKEN_PASTE(GS_PREFIXED_NAME(findpts_el_setup_),D)
@@ -31,171 +31,7 @@
 #define findpts_local_free  GS_TOKEN_PASTE(GS_PREFIXED_NAME(findpts_local_free_ ),D)
 #define findpts_local       GS_TOKEN_PASTE(GS_PREFIXED_NAME(findpts_local_      ),D)
 #define findpts_local_eval  GS_TOKEN_PASTE(GS_PREFIXED_NAME(findpts_local_eval_ ),D)
-/*--------------------------------------------------------------------------
-   Point to Possible Elements Hashing
 
-   Initializing the data:
-     uint nel;        // number of elements
-     uint max_size = nr*ns*nt*nel; // maximum size of hash table
-     struct obbox *obb = ...; // bounding boxes for elements
-
-     hash_data data;
-     hash_build(&data, obb, nel, max_size);
-
-   Using the data:
-     double x[3];   // point to find
-
-     uint index = hash_index_3(&data, x);
-     uint i, b = data.offset[index], e = data.offset[index+1];
-
-     // point may be in elements
-     //   data.offset[b], data.offset[b+1], ... , data.offset[e-1]
-     //
-     // list has maximum size data.max (e.g., e-b <= data.max)
-
-     for(i=b; i!=e; ++i) {
-       uint el = data.offset[i];
-       ...
-     }
-
-   When done:
-     hash_free(&data);
-
-  --------------------------------------------------------------------------*/
-
-struct hash_data {
-  uint hash_n;
-  struct dbl_range bnd[D];
-  double fac[D];
-  uint *offset;
-  uint max;
-};
-
-static uint hash_index(const struct hash_data *p, const double x[D])
-{
-  const uint n = p->hash_n;
-  return ( WHEN_3D( hash_index_aux(p->bnd[2].min,p->fac[2],n,x[2])  *n )
-                   +hash_index_aux(p->bnd[1].min,p->fac[1],n,x[1]) )*n
-                   +hash_index_aux(p->bnd[0].min,p->fac[0],n,x[0]);
-}
-
-static void hash_setfac(struct hash_data *p, const uint n)
-{
-  unsigned d;
-  p->hash_n = n;
-  for(d=0;d<D;++d) p->fac[d] = n/(p->bnd[d].max-p->bnd[d].min);
-}
-
-static struct uint_range hash_range(const struct hash_data *p, unsigned d,
-                                    const struct dbl_range r)
-{
-  struct uint_range ir;
-  const sint i0 = ifloor( (r.min - p->bnd[d].min) * p->fac[d] );
-  const uint i1 = iceil ( (r.max - p->bnd[d].min) * p->fac[d] );
-  ir.min = i0<0 ? 0 : i0;
-  ir.max = i1<p->hash_n ? i1 : p->hash_n;
-  if(ir.max==ir.min) ++ir.max;
-  return ir;
-}
-
-static uint hash_count(struct hash_data *p,
-                       const struct obbox *const obb, const uint nel,
-                       const uint n)
-{
-  uint i,count=0;
-  hash_setfac(p,n);
-  for(i=0;i<nel;++i) {
-    struct uint_range ir; uint ci; unsigned d;
-      ir=hash_range(p,0,obb[i].x[0]); ci  = ir.max-ir.min;
-    for(d=1;d<D;++d)
-      ir=hash_range(p,d,obb[i].x[d]), ci *= ir.max-ir.min;
-    count+=ci;
-  }
-  return count;
-}
-
-uint hash_opt_size(struct hash_data *p,
-                   const struct obbox *const obb, const uint nel,
-                   const uint max_size)
-{
-  uint nl=1, nu=ceil(pow(max_size-nel,1.0/D));
-  uint size_low=2+nel;
-  while(nu-nl>1) {
-    uint nm = nl+(nu-nl)/2, nmd = nm*nm, size;
-    WHEN_3D(nmd *= nm);
-    size = nmd+1+hash_count(p,obb,nel,nm);
-    if(size<=max_size) nl=nm,size_low=size; else nu=nm;
-  }
-  hash_setfac(p,nl);
-  return size_low;
-}
-
-static void hash_bb(struct hash_data *p,
-                    const struct obbox *const obb, const uint nel)
-{
-  uint el; unsigned d;
-  struct dbl_range bnd[D];
-  if(nel) {
-    for(d=0;d<D;++d) bnd[d]=obb[0].x[d];
-    for(el=1;el<nel;++el)
-      for(d=0;d<D;++d)
-        bnd[d]=dbl_range_merge(bnd[d],obb[el].x[d]);
-    for(d=0;d<D;++d) p->bnd[d]=bnd[d];
-  } else {
-    for(d=0;d<D;++d) p->bnd[d].max=p->bnd[d].min=0;
-  }
-}
-
-static void hash_build(struct hash_data *p,
-                       const struct obbox *const obb, const uint nel,
-                       const uint max_size)
-{
-  uint i,el,size,hn,hnd,sum,max, *count;
-  hash_bb(p,obb,nel);
-  size = hash_opt_size(p,obb,nel,max_size);
-  p->offset = tmalloc(uint,size);
-  hn = p->hash_n;
-  hnd = hn*hn; WHEN_3D(hnd*=hn);
-  count = tcalloc(uint,hnd);
-  for(el=0;el<nel;++el) {
-    unsigned d; struct uint_range ir[D];
-    for(d=0;d<D;++d) ir[d]=hash_range(p,d,obb[el].x[d]);
-    #define FOR_LOOP() do { uint i,j; WHEN_3D(uint k;) \
-      WHEN_3D(for(k=ir[2].min;k<ir[2].max;++k)) \
-              for(j=ir[1].min;j<ir[1].max;++j) \
-              for(i=ir[0].min;i<ir[0].max;++i) \
-                ++count[(WHEN_3D(k*hn)+j)*hn+i]; \
-    } while(0)
-    FOR_LOOP();
-    #undef FOR_LOOP
-  }
-  sum=hnd+1, max=count[0];
-  p->offset[0]=sum;
-  for(i=0;i<hnd;++i) {
-    max = count[i]>max?count[i]:max;
-    sum += count[i];
-    p->offset[i+1] = sum;
-  }
-  p->max = max;
-  for(el=0;el<nel;++el) {
-    unsigned d; struct uint_range ir[D];
-    for(d=0;d<D;++d) ir[d]=hash_range(p,d,obb[el].x[d]);
-    #define FOR_LOOP() do { uint i,j; WHEN_3D(uint k;) \
-      WHEN_3D(for(k=ir[2].min;k<ir[2].max;++k)) \
-              for(j=ir[1].min;j<ir[1].max;++j) \
-              for(i=ir[0].min;i<ir[0].max;++i) { \
-                uint index = (WHEN_3D(k*hn)+j)*hn+i; \
-                p->offset[p->offset[index+1]-count[index]]=el; \
-                --count[index]; \
-              } \
-    } while(0)
-    FOR_LOOP();
-    #undef FOR_LOOP
-  }
-  free(count);
-}
-
-static void hash_free(struct hash_data *p) { free(p->offset); }
 
 struct findpts_local_data {
   unsigned ntot;
@@ -226,7 +62,7 @@ void findptsms_local_setup(struct findpts_local_data *const fd,
   fd->nsid = nsid;
   fd->obb=tmalloc(struct obbox,nel);
   obbox_calc(fd->obb,elx,n,nel,m,bbox_tol);
-  hash_build(&fd->hd,fd->obb,nel,max_hash_size);
+  local_hash_build(&fd->hd,fd->obb,nel,max_hash_size);
   findpts_el_setup(&fd->fed,n,npt_max);
   fd->tol = newt_tol;
   fd->ims = ims;
@@ -239,7 +75,7 @@ void findptsms_local_setup(struct findpts_local_data *const fd,
 void findptsms_local_free(struct findpts_local_data *const fd)
 {
   findpts_el_free(&fd->fed);
-  hash_free(&fd->hd);
+  local_hash_free(&fd->hd);
   free(fd->obb);
   if (fd->ims==1) {
    free(fd->distrsti);
@@ -258,7 +94,7 @@ static void map_points_to_els(
         uint   *const         code_base, const unsigned       code_stride,
   const double *const         x_base[D], const unsigned       x_stride[D],
   const uint   *const   session_id_base, const unsigned session_id_stride,
-  const uint   *const  session_id_match, const uint                   npt, 
+  const uint   *const  session_id_match, const uint                   npt,
   const struct findpts_local_data *const fd, buffer *buf)
 {
   uint index;
@@ -270,7 +106,7 @@ static void map_points_to_els(
   const uint *sess_id; sess_id = session_id_base;
   for(index=0;index<npt;++index) {
     double x[D]; for(d=0;d<D;++d) x[d]=*xp[d];
-    { const uint hi = hash_index(&fd->hd,x);
+    { const uint hi = local_hash_index(&fd->hd,x);
       const uint       *elp = fd->hd.offset + fd->hd.offset[hi  ],
                  *const ele = fd->hd.offset + fd->hd.offset[hi+1];
       *code = CODE_NOT_FOUND;
@@ -311,7 +147,7 @@ void findptsms_local(
   const uint   *const  session_id_base, const unsigned session_id_stride,
         double *const       disti_base, const unsigned      disti_stride,
         uint   *const       elsid_base, const unsigned      elsid_stride,
-  const uint   *const session_id_match, const uint                   npt, 
+  const uint   *const session_id_match, const uint                   npt,
    struct findpts_local_data *const fd,  buffer *buf)
 {
   struct findpts_el_data *const fed = &fd->fed;
@@ -358,9 +194,9 @@ void findptsms_local(
             double *r = AT(double,r,index);
             uint *eli = AT(uint,el,index);
             uint *elsid = AT(uint,elsid,index);
-            *eli   = el;    
+            *eli   = el;
             *code  = fpt[i].flags==(1u<<(2*D)) ? CODE_INTERNAL : CODE_BORDER;
-            *dist2 = fpt[i].dist2;   
+            *dist2 = fpt[i].dist2;
             *disti = (fd->ims==1) ? fd->distrsti[i] : 0.;
             *elsid = (fd->ims==1) ? fd->nsid[0]     : 0 ;
 	    for(d=0;d<D;++d) r[d]=fpt[i].r[d];
@@ -441,7 +277,7 @@ void findpts_local(
     *sess_match = 0;
     *disti_base = 0;
     *elsid_base = 0;
-    
+
 
     unsigned sess_stride=0;
     unsigned disti_stride=0;
@@ -491,14 +327,14 @@ void findpts_local_eval(
 #undef findpts_el_free
 #undef findpts_el_setup
 #undef findpts_el_data
-#undef hash_free
-#undef hash_build
+#undef local_hash_free
+#undef local_hash_build
 #undef hash_bb
 #undef hash_opt_size
 #undef hash_count
 #undef hash_range
 #undef hash_setfac
-#undef hash_index
+#undef local_hash_index
 #undef hash_data
 #undef obbox_test
 #undef obbox_calc
