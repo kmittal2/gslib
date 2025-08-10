@@ -31,12 +31,12 @@ static uint local_hash_index_aux(double low, double fac, uint n, double x)
 
 #define D 2
 #define WHEN_3D(a)
-#include "local_hash_base.h"
+#include "local_hash_imp.h"
 #undef WHEN_3D
 #undef D
 
 #define D 3
 #define WHEN_3D(a) a
-#include "local_hash_base.h"
+#include "local_hash_imp.h"
 #undef WHEN_3D
 #undef D

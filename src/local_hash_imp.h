@@ -1,4 +1,4 @@
-#define obbox               GS_TOKEN_PASTE(obbox_             ,D)
+#define obbox                     GS_TOKEN_PASTE(obbox_             ,D)
 #define local_hash_data           GS_TOKEN_PASTE(findpts_local_hash_data_,D)
 #define local_hash_index          GS_TOKEN_PASTE(local_hash_index_        ,D)
 #define local_hash_setfac         GS_TOKEN_PASTE(local_hash_setfac_       ,D)
@@ -8,7 +8,7 @@
 #define local_hash_bb             GS_TOKEN_PASTE(local_hash_bb_           ,D)
 #define local_hash_build          GS_TOKEN_PASTE(local_hash_build_        ,D)
 #define local_hash_free           GS_TOKEN_PASTE(local_hash_free_         ,D)
-#define local_hash_build_nx          GS_TOKEN_PASTE(local_hash_build_nx_       ,D)
+#define local_hash_build_nx       GS_TOKEN_PASTE(local_hash_build_nx_       ,D)
 
 struct local_hash_data {
   uint local_hash_n;

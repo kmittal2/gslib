@@ -70,12 +70,12 @@ static uint count_bits(unsigned char *p, uint n)
 
 #define D 2
 #define WHEN_3D(a)
-#include "global_hash_base.h"
+#include "global_hash_imp.h"
 #undef WHEN_3D
 #undef D
 
 #define D 3
 #define WHEN_3D(a) a
-#include "global_hash_base.h"
+#include "global_hash_imp.h"
 #undef WHEN_3D
 #undef D
