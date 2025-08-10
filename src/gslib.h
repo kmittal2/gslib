@@ -28,11 +28,11 @@ extern "C" {
 #include "poly.h"
 #include "lob_bnd.h"
 #include "obbox.h"
-#include "findpts.h"
 #include "findpts_el.h"
 #include "local_hash.h"
 #include "findpts_local.h"
 #include "global_hash.h"
+#include "findpts.h"
 #ifdef __cplusplus
 }
 #endif

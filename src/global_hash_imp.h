@@ -1,4 +1,4 @@
-#define obbox               GS_TOKEN_PASTE(obbox_             ,D)
+#define obbox           GS_TOKEN_PASTE(obbox_             ,D)
 #define local_hash_data GS_TOKEN_PASTE(findpts_local_hash_data_,D)
 #define hash_data       GS_TOKEN_PASTE(findpts_hash_data_,D)
 #define hash_index      GS_TOKEN_PASTE(hash_index_       ,D)
@@ -10,7 +10,7 @@
 #define table_from_hash GS_TOKEN_PASTE(table_from_hash_  ,D)
 #define hash_build      GS_TOKEN_PASTE(hash_build_       ,D)
 #define hash_free       GS_TOKEN_PASTE(hash_free_        ,D)
-#define hash_build_nx      GS_TOKEN_PASTE(hash_build_nx_       ,D)
+#define hash_build_nx   GS_TOKEN_PASTE(hash_build_nx_       ,D)
 
 struct hash_data {
   ulong hash_n;

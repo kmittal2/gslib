@@ -23,8 +23,29 @@
 #define findpts_3         GS_PREFIXED_NAME(findpts_3      )
 #define findpts_eval_3    GS_PREFIXED_NAME(findpts_eval_3 )
 
-struct findpts_data_2;
-struct findpts_data_3;
+struct findpts_dummy_ms_data {
+    unsigned int *nsid;
+    double       *distfint;
+};
+
+struct findpts_data_2 {
+  struct crystal cr;
+  struct findpts_local_data_2 local;
+  struct findpts_hash_data_2 hash;
+  struct array savpt;
+  struct findpts_dummy_ms_data fdms;
+  uint   fevsetup;
+};
+
+struct findpts_data_3 {
+  struct crystal cr;
+  struct findpts_local_data_3 local;
+  struct findpts_hash_data_3 hash;
+  struct array savpt;
+  struct findpts_dummy_ms_data fdms;
+  uint   fevsetup;
+};
+
 
 struct findpts_data_2 *findptsms_setup_2(
   const struct comm *const comm,
@@ -32,7 +53,7 @@ struct findpts_data_2 *findptsms_setup_2(
   const unsigned n[2], const uint nel,
   const unsigned m[2], const double bbox_tol,
   const uint local_hash_size, const uint global_hash_size,
-  const unsigned npt_max, const double newt_tol, 
+  const unsigned npt_max, const double newt_tol,
   const uint *const nsid, const double *const distfint);
 
 struct findpts_data_3 *findptsms_setup_3(
@@ -56,7 +77,7 @@ void findptsms_2(      uint   *const        code_base, const unsigned       code
                  const uint   *const  session_id_base, const unsigned session_id_stride,
                  const uint   *const session_id_match, const uint                   npt,
                       struct findpts_data_2 *const fd);
- 
+
 void findptsms_3(      uint   *const        code_base, const unsigned       code_stride,
                        uint   *const        proc_base, const unsigned       proc_stride,
                        uint   *const          el_base, const unsigned         el_stride,
@@ -75,7 +96,7 @@ void findptsms_eval_2(
   const double *const    r_base, const unsigned    r_stride,
   const uint npt,
   const double *const in, struct findpts_data_2 *const fd);
- 
+
 void findptsms_eval_3(
         double *const  out_base, const unsigned  out_stride,
   const uint   *const code_base, const unsigned code_stride,
