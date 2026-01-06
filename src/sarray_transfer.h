@@ -191,7 +191,8 @@ uint sarray_transfer_soa_to_buffer(struct crystal *cr, const uint n_in,
 
   Output:
     rank_recv: array to store source ranks (size n_out).
-              Caller must allocate this.
+              Caller must allocate this. Only specify it if keep_src was true
+              in sarray_transfer_soa_to_buffer.
     data_recv: array of pointers to output arrays (size n_fields).
               data_recv[k] must point to a buffer of size n_out*byte_sizes[k].
               Caller must allocate these buffers.
@@ -215,8 +216,7 @@ uint sarray_transfer_soa_to_buffer(struct crystal *cr, const uint n_in,
 void sarray_transfer_unpack_buffer_to_soa(struct crystal *cr, uint n_out,
                                           int n_fields,
                                           const size_t *byte_sizes,
-                                          uint *rank_recv, void **data_recv
-);
+                                          uint *rank_recv, void **data_recv);
 
 /*
   Structure-of-Arrays (SoA).
@@ -230,7 +230,8 @@ void sarray_transfer_unpack_buffer_to_soa(struct crystal *cr, uint n_out,
   pointer in data_recv.
 */
 void sarray_transfer_soa(struct crystal *cr, const uint n_in, const uint *dest,
-                         int n_fields, const size_t *byte_sizes, void **data_send,
+                         int n_fields, const size_t *byte_sizes,
+                         void **data_send,
                          uint *n_out, uint **rank_recv, void **data_recv);
 
 #endif

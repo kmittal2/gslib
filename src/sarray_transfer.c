@@ -202,11 +202,11 @@ uint sarray_transfer_soa_to_buffer(struct crystal *cr, const uint n_in,
                                    const size_t *byte_sizes, void **data_send)
 {
   uint *perm;
-  unsigned row_size, off, row_size_bytes;
+  unsigned row_size;
   int k;
 
   /* Calculate row size */
-  row_size_bytes = sizeof(uint); /* dest rank */
+  size_t row_size_bytes = 0;
   for(k=0; k<n_fields; ++k) row_size_bytes += byte_sizes[k];
 
   /* Align to uint */
@@ -215,13 +215,13 @@ uint sarray_transfer_soa_to_buffer(struct crystal *cr, const uint n_in,
   /* Sort based on destination */
   perm = sortp(&cr->work, 0, dest, n_in, sizeof(uint));
 
-  /* Pack destination ranks */
-  pack_ext(&cr->data, row_size, cr->comm.id, (char*)dest, n_in, sizeof(uint),
-           dest, sizeof(uint), perm);
+  /* Pack 1st field and specify destination */
+  pack_ext(&cr->data, row_size, cr->comm.id, (char*)data_send[0], n_in,
+           byte_sizes[0], dest, sizeof(uint), perm);
+  size_t off = byte_sizes[0];
 
-  /* Pack fields */
-  off = sizeof(uint);
-  for(k=0; k<n_fields; ++k) {
+  /* Pack Remaining Fields */
+  for(k=1; k<n_fields; ++k) {
     pack_more(&cr->data, off, row_size, (char*)data_send[k], byte_sizes[k], perm);
     off += byte_sizes[k];
   }
@@ -238,23 +238,35 @@ void sarray_transfer_unpack_buffer_to_soa(struct crystal *cr, uint n_out,
                                           const size_t *byte_sizes,
                                           uint *rank_recv, void **data_recv)
 {
-  unsigned row_size, off, row_size_bytes;
+  unsigned row_size;
   int k;
 
   if(n_out == 0) return;
 
   /* Recalculate row size */
-  row_size_bytes = sizeof(uint);
+  size_t row_size_bytes = 0;
   for(k=0; k<n_fields; ++k) row_size_bytes += byte_sizes[k];
+
   row_size = (row_size_bytes + sizeof(uint) - 1) / sizeof(uint);
 
-  /* Unpack Source Ranks into rank_recv */
+  /* Unpack source ranks from headers */
   if(rank_recv) {
-    unpack_int((char*)rank_recv, sizeof(uint), 0, &cr->data, row_size, 1);
+    const uint *buf = cr->data.ptr, *buf_end = buf+cr->data.n;
+    uint *out = rank_recv;
+    while(buf!=buf_end) {
+      const uint src = buf[1]; // source rank
+      const uint len = buf[2]; // payload size in uints
+      const uint *msg_end = buf+3+len;
+      buf+=3;
+      while(buf!=msg_end) {
+        *out++ = src;
+        buf+=row_size;
+      }
+    }
   }
 
   /* Unpack fields */
-  off = sizeof(uint);
+  size_t off = 0;
   for(k=0; k<n_fields; ++k) {
     if(data_recv[k]) {
       unpack_more((char*)data_recv[k], byte_sizes[k], &cr->data, off, row_size);
@@ -283,7 +295,8 @@ void sarray_transfer_soa(struct crystal *cr, const uint n_in, const uint *dest,
     }
 
     /* Unpack */
-    sarray_transfer_unpack_buffer_to_soa(cr, *n_out, n_fields, byte_sizes, *rank_recv, data_recv);
+    sarray_transfer_unpack_buffer_to_soa(cr, *n_out, n_fields, byte_sizes,
+                                         *rank_recv, data_recv);
   } else {
     *rank_recv = NULL;
     for (k = 0; k < n_fields; ++k) data_recv[k] = NULL;
